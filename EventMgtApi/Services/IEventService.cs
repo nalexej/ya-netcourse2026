@@ -30,7 +30,7 @@ public interface IEventService
     /// <summary>
     /// Добавляет новое событие в коллекцию.
     /// </summary>
-    /// <param name="evt">Событие, которое необходимо добавить. Не должно быть <see langword="null"/>.</param>
+    /// <param name="evtDto">Событие, которое необходимо добавить. Не должно быть <see langword="null"/>.</param>
     /// <exception cref="ArgumentNullException">
     /// Вызывается, если параметр <paramref name="evtDto"/> равен <see langword="null"/>.
     /// </exception>
