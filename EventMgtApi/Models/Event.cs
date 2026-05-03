@@ -21,7 +21,7 @@ namespace EventMgtApi.Models
         /// <summary>
         /// Описание события. Необязательное поле.
         /// </summary>
-        public string Description { get; set; } = string.Empty;
+        public string? Description { get; set; }
 
         /// <summary>
         /// Дата и время начала события.

@@ -44,8 +44,18 @@ public class EventService : IEventService
     /// </returns>
     public Event? GetEvent(Guid id)
     {
-        lock (_lock) 
-            return _events.FirstOrDefault(evt => evt.Id == id);
+        lock (_lock)
+        {
+            var original = _events.FirstOrDefault(e => e.Id == id);
+            return original is null ? null : new Event
+            {
+                Id = original.Id,
+                Title = original.Title,
+                Description = original.Description,
+                StartAt = original.StartAt,
+                EndAt = original.EndAt
+            };
+        }
     }
 
     /// <summary>
@@ -92,7 +102,7 @@ public class EventService : IEventService
             if (existingEvent != null)
             {
                 existingEvent.Title = evtDto.Title;
-                existingEvent.Description = evtDto.Description;
+                existingEvent.Description = evtDto.Description ?? string.Empty;
                 existingEvent.StartAt = evtDto.StartAt;
                 existingEvent.EndAt = evtDto.EndAt;
             }

@@ -19,7 +19,7 @@ namespace EventMgtApi.Models.Dto;
         /// Описание события. Необязательное поле.
         /// По умолчанию — пустая строка, чтобы избежать null-значений.
         /// </summary>
-        public string Description { get; set; } = string.Empty;
+        public string? Description { get; set; }
 
         /// <summary>
         /// Дата и время начала события. Обязательное поле.

@@ -1,4 +1,4 @@
-﻿using EventMgtApi.Models;
+﻿using EventMgtApi.Extensions;
 using EventMgtApi.Models.Dto;
 using EventMgtApi.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -28,13 +28,16 @@ public class EventsController : ControllerBase
     /// Возвращает список всех событий.
     /// </summary>
     /// <returns>
-    /// HTTP 200 (OK) с коллекцией событий.
+    /// HTTP 200 с коллекцией <see cref="EventDtoResponse"/>, 
+    /// представляющей все события в системе.
     /// </returns>
     [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<EventDtoResponse>), StatusCodes.Status200OK)]
     public IActionResult GetEvents()
     {
         var events = _eventService.GetEvents();
-        return Ok(events);
+        var dtos = events.Select(e => e.ToDtoResponse()).ToList();
+        return Ok(dtos);
     }
 
     /// <summary>
@@ -42,13 +45,20 @@ public class EventsController : ControllerBase
     /// </summary>
     /// <param name="id">Идентификатор события.</param>
     /// <returns>
-    /// HTTP 200 (OK) с событием, если найдено; иначе — HTTP 404 (Not Found).
+    /// Возвращает <see cref="EventDtoResponse"/> с данными события (HTTP 200), 
+    /// Если событие не найдено - возвращает 404 (NotFound);
+    /// При ошибке валидации входных данных — 400 (Bad Request).
     /// </returns>
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(EventDtoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult GetEvent(Guid id)
     {
         var evt = _eventService.GetEvent(id);
-        return evt is null ? NotFound() : Ok(evt);
+        return evt is not null
+            ? Ok(evt.ToDtoResponse())
+            : NotFound($"Событие с ID {id} не найдено.");
     }
 
     /// <summary>
@@ -56,21 +66,22 @@ public class EventsController : ControllerBase
     /// </summary>
     /// <param name="evtDto">Модель события, переданная в теле запроса. Не должна быть null.</param>
     /// <returns>
-    /// HTTP 201 (Created) с URL нового ресурса в заголовке <c>Location</c>, если успешно;
-    /// иначе — HTTP 400 (Bad Request).
+    /// Возвращает <see cref="EventDtoResponse"/> с кодом 201 (Created) и URL нового ресурса в заголовке <c>Location</c>.
+    /// При ошибке валидации входных данных — 400 (Bad Request).
     /// </returns>
     [HttpPost]
-    public IActionResult AddEvent([FromBody]EventDto evtDto)
+    [ProducesResponseType(typeof(EventDtoResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult AddEvent([FromBody] EventDto evtDto)
     {
-        try
-        {
-            Event addedEvent = _eventService.AddEvent(evtDto);
-            return CreatedAtAction(nameof(GetEvent), new { id = addedEvent.Id }, addedEvent);
-        }
-        catch (ArgumentNullException ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        var addedEvent = _eventService.AddEvent(evtDto);
+        var responseDto = addedEvent.ToDtoResponse();
+
+        return CreatedAtAction(
+            nameof(GetEvent),
+            new { id = addedEvent.Id },
+            responseDto
+        );
     }
 
     /// <summary>
@@ -79,13 +90,21 @@ public class EventsController : ControllerBase
     /// <param name="id">Идентификатор события, которое необходимо обновить.</param>
     /// <param name="evtDto">Новые данные события.</param>
     /// <returns>
-    /// HTTP 200 (OK) с обновлённым событием, если найдено и изменено; иначе — HTTP 404 (Not Found).
+    /// Возвращает <see cref="EventDtoResponse"/> с обновлёнными данными (HTTP 200), 
+    /// если событие найдено и успешно изменено; 
+    /// иначе — HTTP 404 (Not Found). 
+    /// При ошибке валидации входных данных — 400 (Bad Request).
     /// </returns>
     [HttpPut("{id}")]
+    [ProducesResponseType(typeof(EventDtoResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult UpdateEvent(Guid id, [FromBody]EventDto evtDto)
     {
-        var updated = _eventService.UpdateEvent(id, evtDto);
-        return updated is null ? NotFound() : Ok(updated);
+        var updatedEvent = _eventService.UpdateEvent(id, evtDto);
+        return updatedEvent is not null
+            ? Ok(updatedEvent.ToDtoResponse())
+            : NotFound($"Событие с ID {id} не найдено.");
     }
 
     /// <summary>
@@ -93,12 +112,17 @@ public class EventsController : ControllerBase
     /// </summary>
     /// <param name="id">Идентификатор события для удаления.</param>
     /// <returns>
-    /// HTTP 204 (No Content), если событие успешно удалено; иначе — HTTP 404 (Not Found).
+    /// Возвращает HTTP 204 (No Content), если событие успешно удалено; 
+    /// HTTP 404 (Not Found), если событие с указанным ID не найдено; 
+    /// При ошибке валидации входных данных — 400 (Bad Request).
     /// </returns>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult RemoveEvent(Guid id)
     {
         var result = _eventService.RemoveEvent(id);
-        return result ? NoContent() : NotFound();
+        return result ? NoContent() : NotFound($"Событие с ID {id} не найдено.");
     }
 }
