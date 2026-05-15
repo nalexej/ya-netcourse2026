@@ -13,12 +13,20 @@ namespace EventMgtApi.Middleware;
 public class GlobalExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ILogger<GlobalExceptionHandlingMiddleware> _logger;
 
     /// <summary>
-    /// Инициализирует новый экземпляр middleware.
+    /// Инициализирует новый экземпляр middleware для глобальной обработки исключений.
     /// </summary>
-    /// <param name="next">Следующий делегат в конвейере HTTP-запросов.</param>
-    public GlobalExceptionHandlingMiddleware(RequestDelegate next) => _next = next;
+    /// <param name="next">Следующий делегат в конвейере обработки HTTP-запроса.</param>
+    /// <param name="logger">Сервис логирования, используемый для записи информации о необработанных исключениях.</param>
+    public GlobalExceptionHandlingMiddleware(
+        RequestDelegate next,
+        ILogger<GlobalExceptionHandlingMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
 
     /// <summary>
     /// Выполняет логику middleware: перехватывает исключения и возвращает ошибки в стандартизированном виде.
@@ -30,18 +38,34 @@ public class GlobalExceptionHandlingMiddleware
         {
             await _next(context);
         }
-        catch (ValidationException ex)
+        catch (Exception ex)
         {
-            await HandleValidationExceptionAsync(context, ex);
+            await HandleExceptionAsync(context, ex);
         }
-        catch (NotFoundException ex)
+    }
+
+    /// <summary>
+    /// Асинхронно обрабатывает необработанное исключение, записывает его в лог и формирует соответствующий ответ.
+    /// Если ответ уже начат, обработка прерывается во избежание исключения при записи в тело ответа.
+    /// </summary>
+    /// <param name="httpContext">Контекст HTTP-запроса, в котором произошло исключение.</param>
+    /// <param name="exception">Исключение, требующее обработки.</param>
+    /// <remarks>
+    /// Метод использует pattern matching для определения типа исключения и делегирует дальнейшую обработку 
+    /// соответствующему обработчику: <see cref="HandleValidationExceptionAsync"/>, 
+    /// <see cref="HandleNotFoundExceptionAsync"/> или <see cref="HandleInternalServerErrorAsync"/>.
+    /// </remarks>
+    private async Task HandleExceptionAsync(HttpContext httpContext, Exception exception)
+    {
+        if (httpContext.Response.HasStarted)
+            return;
+
+        await (exception switch
         {
-            await HandleNotFoundExceptionAsync(context, ex);
-        }
-        catch (Exception)
-        {
-            await HandleInternalServerErrorAsync(context);
-        }
+            ValidationException ex => HandleValidationExceptionAsync(httpContext, ex),
+            NotFoundException ex => HandleNotFoundExceptionAsync(httpContext, ex),
+            _ => HandleInternalServerErrorAsync(httpContext)
+        });
     }
 
     /// <summary>
@@ -49,8 +73,20 @@ public class GlobalExceptionHandlingMiddleware
     /// </summary>
     /// <param name="context">Контекст HTTP-запроса.</param>
     /// <param name="ex">Исключение с <see cref="ModelStateDictionary"/>.</param>
-    private static async Task HandleValidationExceptionAsync(HttpContext context, ValidationException ex)
+    private async Task HandleValidationExceptionAsync(HttpContext context, ValidationException ex)
     {
+        // Логируем детали валидации
+        var errorMessages = string.Join("; ", ex.ModelState
+            .Where(kv => kv.Value?.Errors.Count > 0)
+            .SelectMany(kv => kv.Value!.Errors.Select(e => $"{kv.Key}: {e.ErrorMessage}")));
+
+        _logger.LogError(
+            "Ошибка валидации. Method={Method}, Path={Path}, Errors={Errors}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            errorMessages,
+            context.Request.Headers["x-request-id"].ToString()); // закладка на будущее
+
         var details = new ProblemDetails
         {
             Title = "Ошибка валидации",
@@ -59,9 +95,8 @@ public class GlobalExceptionHandlingMiddleware
             Instance = context.Request.Path,
         };
 
-        // Добавляем errors в Extensions → они попадут в JSON
         var errors = ex.ModelState
-            .Where(kv => kv.Value!.Errors.Count > 0)
+            .Where(kv => kv.Value?.Errors.Count > 0)
             .ToDictionary(
                 kv => kv.Key,
                 kv => (object?)kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
@@ -77,8 +112,15 @@ public class GlobalExceptionHandlingMiddleware
     /// </summary>
     /// <param name="context">Контекст HTTP-запроса.</param>
     /// <param name="ex">Исключение с сообщением об отсутствующем ресурсе.</param>
-    private static async Task HandleNotFoundExceptionAsync(HttpContext context, NotFoundException ex)
+    private async Task HandleNotFoundExceptionAsync(HttpContext context, NotFoundException ex)
     {
+        _logger.LogWarning(
+            "Ресурс не найден. Method={Method}, Path={Path}, Message={Message}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            ex.Message,
+            context.Request.Headers["x-request-id"].ToString()); // закладка на будущее
+
         var details = new ProblemDetails
         {
             Title = "Ресурс не найден",
@@ -94,8 +136,15 @@ public class GlobalExceptionHandlingMiddleware
     /// Обрабатывает необработанные исключения, возвращая 500.
     /// </summary>
     /// <param name="context">Контекст HTTP-запроса.</param>
-    private static async Task HandleInternalServerErrorAsync(HttpContext context)
+    private async Task HandleInternalServerErrorAsync(HttpContext context)
     {
+        _logger.LogCritical(
+            "Внутренняя ошибка сервера. Method={Method}, Path={Path}, RequestId={RequestId}, TraceId={TraceId}",
+            context.Request.Method,
+            context.Request.Path,
+            context.Request.Headers["x-request-id"].ToString(), // закладка на будущее
+            context.TraceIdentifier);
+
         var details = new ProblemDetails
         {
             Title = "Внутренняя ошибка сервера",
