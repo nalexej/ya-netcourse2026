@@ -26,4 +26,19 @@ public static class EventMappingExtensions
             EndAt = eventEntity.EndAt
         };
     }
+
+    /// <summary>
+    /// Преобразует коллекцию событий в список DTO.
+    /// </summary>
+    /// <param name="events">Коллекция событий для преобразования. Не должна быть <see langword="null"/>.</param>
+    /// <returns>
+    /// Новый экземпляр <see cref="List{T}"/>, содержащий объекты <see cref="EventDtoResponse"/>.
+    /// Изменения в возвращаемом списке не влияют на исходную коллекцию.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Если <paramref name="events"/> — <see langword="null"/>.</exception>
+    public static List<EventDtoResponse> ToDtoList(this IEnumerable<Event> events)
+    {
+        ArgumentNullException.ThrowIfNull(events, nameof(events));
+        return events.Select(e => e.ToDtoResponse()).ToList();
+    }
 }
