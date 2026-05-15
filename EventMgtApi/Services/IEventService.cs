@@ -1,4 +1,5 @@
-﻿using EventMgtApi.Models;
+﻿using EventMgtApi.Exceptions;
+using EventMgtApi.Models;
 using EventMgtApi.Models.Dto;
 
 namespace EventMgtApi.Services;
@@ -12,53 +13,69 @@ public interface IEventService
     /// <summary>
     /// Возвращает список всех событий.
     /// </summary>
-    /// <returns>
-    /// Новый экземпляр <see cref="List{T}"/>, содержащий копию всех текущих событий.
-    /// Изменения возвращаемого списка не влияют на внутреннее состояние сервиса.
-    /// </returns>
-    List<Event> GetEvents();
+    ///<returns>
+    /// Экземпляр<see cref = "PaginatedResult{T}" />, содержащий отфильтрованные и разбитые на страницы события.
+    ///</returns>
+    PaginatedResult<EventDtoResponse> GetEvents(
+        string? title = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        int page = 1,
+        int pageSize = 10);
 
     /// <summary>
     /// Возвращает событие по указанному идентификатору.
     /// </summary>
     /// <param name="id">Идентификатор события для поиска.</param>
     /// <returns>
-    /// Найденное событие, если оно существует; иначе — <see langword="null"/>.
-    /// </returns>
-    Event? GetEvent(Guid id);
+    /// Копия найденного события в виде <see cref="EventDtoResponse"/>.</returns>
+    /// <exception cref="NotFoundException">
+    /// Исключение выбрасывается, если событие с указанным <paramref name="id"/> не найдено.
+    /// </exception>   
+    EventDtoResponse GetEvent(Guid id);
 
     /// <summary>
-    /// Добавляет новое событие в коллекцию.
+    /// Добавляет новое событие.
     /// </summary>
-    /// <param name="evtDto">Событие, которое необходимо добавить. Не должно быть <see langword="null"/>.</param>
-    /// <exception cref="ArgumentNullException">
-    /// Вызывается, если параметр <paramref name="evtDto"/> равен <see langword="null"/>.
+    /// <param name="evtDto">Данные события, которое необходимо добавить. Не должно быть null.</param>
+    /// <returns>Возвращает копию добавленного события в виде <see cref="EventDtoResponse"/>.</returns>
+    /// <exception cref="ArgumentNullException">Выбрасывается, если параметр <paramref name="evtDto"/> равен null.</exception>
+    /// <exception cref="ValidationException">
+    /// Выбрасывается, если:
+    /// <list type="bullet">
+    ///   <item><description>Заголовок пуст или состоит только из пробелов.</description></item>
+    ///   <item><description>Дата начала не меньше даты окончания.</description></item>
+    /// </list>
     /// </exception>
-    Event AddEvent(EventDto evtDto);
+    EventDtoResponse AddEvent(EventDto evtDto);
 
     /// <summary>
     /// Обновляет существующее событие по указанному идентификатору.
     /// </summary>
-    /// <param name="id">Идентификатор события, которое необходимо обновить.</param>
-    /// <param name="evtDto">Новые данные события. Не должны быть <see langword="null"/>.</param>
-    /// <returns>
-    /// Возвращает обновлённое событие, если оно найдено и успешно изменено; иначе — <see langword="null"/>.
-    /// </returns>
+    /// <param name="id">Уникальный идентификатор события для обновления.</param>
+    /// <param name="evtDto">Новые данные события. Не должен быть <see langword="null"/>.</param>
+    /// <returns>Возвращает обновлённую копию события в виде <see cref="EventDtoResponse"/>.</returns>
     /// <exception cref="ArgumentNullException">
-    /// Вызывается, если параметр <paramref name="evtDto"/> равен <see langword="null"/>.
+    /// Выбрасывается, если параметр <paramref name="evtDto"/> равен <see langword="null"/>.
     /// </exception>
-    Event? UpdateEvent(Guid id, EventDto evtDto);
+    /// <exception cref="ValidationException">
+    /// Выбрасывается, если:
+    /// <list type="bullet">
+    ///   <item><description>Заголовок пуст или состоит только из пробелов.</description></item>
+    ///   <item><description>Дата начала не меньше даты окончания.</description></item>
+    /// </list>
+    /// </exception>
+    /// <exception cref="NotFoundException">
+    /// Выбрасывается, если событие с указанным <paramref name="id"/> не найдено.
+    /// </exception>
+    EventDtoResponse UpdateEvent(Guid id, EventDto evtDto);
 
     /// <summary>
     /// Удаляет событие по указанному идентификатору.
     /// </summary>
     /// <param name="id">Идентификатор события, которое необходимо удалить.</param>
-    /// <returns>
-    /// <see langword="true"/>, если событие было найдено и удалено; иначе — <see langword="false"/>.
-    /// </returns>
-    /// <remarks>
-    /// Предполагается, что идентификаторы уникальны. 
-    /// Если несколько событий имеют одинаковый <paramref name="id"/> (что маловероятно), все они будут удалены.
-    /// </remarks>
-    bool RemoveEvent(Guid id);
+    /// <exception cref="NotFoundException">
+    /// Выбрасывается, если событие с указанным <paramref name="id"/> не найдено.
+    /// </exception>
+    void RemoveEvent(Guid id);
 }
