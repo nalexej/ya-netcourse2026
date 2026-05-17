@@ -32,18 +32,22 @@ public class EventsController : ControllerBase
     /// представляющей все события в системе.
     /// </returns>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<EventDtoResponse>), StatusCodes.Status200OK)]
-    public IActionResult GetEvents()
+    [ProducesResponseType(typeof(PaginatedResult<EventDtoResponse>), StatusCodes.Status200OK)]
+    public IActionResult GetEvents(
+        [FromQuery] string? title = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var events = _eventService.GetEvents();
-        var dtos = events.Select(e => e.ToDtoResponse()).ToList();
-        return Ok(dtos);
+        var result = _eventService.GetEvents(title, from, to, page, pageSize);
+        return Ok(result);
     }
 
     /// <summary>
     /// Возвращает событие по указанному идентификатору.
     /// </summary>
-    /// <param name="id">Идентификатор события.</param>
+    /// <param name="id">Идентификатор события. Должен быть в формате GUID.</param>
     /// <returns>
     /// Возвращает <see cref="EventDtoResponse"/> с данными события (HTTP 200), 
     /// Если событие не найдено - возвращает 404 (NotFound);
@@ -56,9 +60,7 @@ public class EventsController : ControllerBase
     public IActionResult GetEvent(Guid id)
     {
         var evt = _eventService.GetEvent(id);
-        return evt is not null
-            ? Ok(evt.ToDtoResponse())
-            : NotFound($"Событие с ID {id} не найдено.");
+        return Ok(evt);
     }
 
     /// <summary>
@@ -75,12 +77,11 @@ public class EventsController : ControllerBase
     public IActionResult AddEvent([FromBody] EventDto evtDto)
     {
         var addedEvent = _eventService.AddEvent(evtDto);
-        var responseDto = addedEvent.ToDtoResponse();
 
         return CreatedAtAction(
             nameof(GetEvent),
             new { id = addedEvent.Id },
-            responseDto
+            addedEvent
         );
     }
 
@@ -102,9 +103,7 @@ public class EventsController : ControllerBase
     public IActionResult UpdateEvent(Guid id, [FromBody]EventDto evtDto)
     {
         var updatedEvent = _eventService.UpdateEvent(id, evtDto);
-        return updatedEvent is not null
-            ? Ok(updatedEvent.ToDtoResponse())
-            : NotFound($"Событие с ID {id} не найдено.");
+        return Ok(updatedEvent);
     }
 
     /// <summary>
@@ -122,7 +121,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult RemoveEvent(Guid id)
     {
-        var result = _eventService.RemoveEvent(id);
-        return result ? NoContent() : NotFound($"Событие с ID {id} не найдено.");
+        _eventService.RemoveEvent(id); // выбросит NotFoundException, если не найдено
+        return NoContent();
     }
 }

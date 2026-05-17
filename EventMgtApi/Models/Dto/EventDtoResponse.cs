@@ -23,10 +23,10 @@ public class EventDtoResponse
     /// <summary>
     /// Дата и время начала события.
     /// </summary>
-    public required DateTime StartAt { get; set; }
+    public required DateTime? StartAt { get; set; }
 
     /// <summary>
     /// Дата и время окончания события.
     /// </summary>
-    public required DateTime EndAt { get; set; }
+    public required DateTime? EndAt { get; set; }
 }
