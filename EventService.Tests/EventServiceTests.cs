@@ -6,6 +6,7 @@ using EventMgtApi.Services;
 using EventMgtApi.Repositories;
 using EventMgtApi.Exceptions;
 using Xunit;
+using FluentAssertions;
 
 namespace EventMgtApi.Tests;
 
@@ -72,18 +73,21 @@ public class EventServiceTests
         var result = _service.AddEvent(inputEvent);
 
         // Assert
-        Assert.NotNull(result);
-        Assert.NotEqual(Guid.Empty, result.Id);
-        Assert.Equal(inputEvent.Title, result.Title);
-        Assert.Equal(expectedDescription, result.Description);
-        Assert.Equal(inputEvent.StartAt, result.StartAt);
-        Assert.Equal(inputEvent.EndAt, result.EndAt);
+        result.Should().NotBeNull("потому что сервис должен возвращать результат");
+        result.Id.Should().NotBeEmpty("потому что новое событие должно иметь сгенерированный Guid");
+        result.Title.Should().Be(inputEvent.Title);
+        result.Description.Should().Be(expectedDescription);
+        result.StartAt.Should().Be(inputEvent.StartAt);
+        result.EndAt.Should().Be(inputEvent.EndAt);
     }
 
-    // Проверяет валидацию: пустой заголовок → ошибка
+    /// <summary>
+    /// Проверяет, что при пустом заголовке выбрасывается ValidationException с корректным сообщением.
+    /// </summary>
     [Fact]
     public void AddEvent_TitleEmpty_ThrowsValidationException()
     {
+        // Arrange
         var dto = new EventDto
         {
             Title = string.Empty,
@@ -91,13 +95,22 @@ public class EventServiceTests
             EndAt = DateTime.UtcNow.AddDays(2)
         };
 
-        Assert.Throws<ValidationException>(() => _service.AddEvent(dto));
+        // Act & Assert
+        var exception = _service.Invoking(s => s.AddEvent(dto))
+                               .Should().Throw<ValidationException>()
+                               .Which;
+
+        exception.Message.Should().Be("Заголовок обязателен.");
     }
 
-    // Проверяет валидацию: дата окончания раньше начала → ошибка
+    /// <summary>
+    /// Проверяет, что при попытке создать событие с датой окончания раньше начала 
+    /// выбрасывается ValidationException с корректным сообщением.
+    /// </summary>
     [Fact]
     public void AddEvent_StartAfterEnd_ThrowsValidationException()
     {
+        // Arrange
         var dto = new EventDto
         {
             Title = "Тест",
@@ -105,7 +118,10 @@ public class EventServiceTests
             EndAt = DateTime.UtcNow.AddDays(1)
         };
 
-        Assert.Throws<ValidationException>(() => _service.AddEvent(dto));
+        // Act & Assert
+        _service.Invoking(s => s.AddEvent(dto))
+                .Should().Throw<ValidationException>()
+                .WithMessage("Дата начала должна быть раньше даты окончания.");
     }
 
     // ========================================================================
