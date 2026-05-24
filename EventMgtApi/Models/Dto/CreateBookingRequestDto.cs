@@ -4,13 +4,12 @@ using System.ComponentModel.DataAnnotations;
 namespace EventMgtApi.Models;
 
 /// <summary>
-/// DTO для создания новой брони.
+/// DTO для создания брони. Пока пустой — можно расширить.
 /// </summary>
 public class CreateBookingRequestDto
 {
-    /// <summary>
-    /// Идентификатор события, которое бронируется.
-    /// </summary>
-    [Required(ErrorMessage = "Идентификатор события обязателен.")]
-    public Guid? EventId { get; set; }
+    // Можно добавить позже:
+    // public int TicketsCount { get; set; }
+    // public string Email { get; set; }
+    // public string Name { get; set; }
 }
