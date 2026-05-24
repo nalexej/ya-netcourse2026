@@ -20,6 +20,7 @@ builder.Services.AddControllers(options =>
 });
 builder.Services.AddSingleton<IEventRepository, InMemoryEventRepository>();
 builder.Services.AddSingleton<IEventService, EventService>();
+builder.Services.AddSingleton<IBookingRepository, InMemoryBookingRepository>();
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();
