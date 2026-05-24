@@ -28,6 +28,9 @@ builder.Services.AddSingleton<IEventService, EventService>();
 builder.Services.AddSingleton<IBookingRepository, InMemoryBookingRepository>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
+// Регистрация фонового сервиса
+builder.Services.AddHostedService<BookingProcessingBackgroundService>();
+
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

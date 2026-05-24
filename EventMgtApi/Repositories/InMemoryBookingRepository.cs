@@ -66,11 +66,15 @@ public class InMemoryBookingRepository : IBookingRepository
         if (booking == null)
             throw new ArgumentNullException(nameof(booking));
 
-        // Обновляем только если существует
-        return _bookings.ContainsKey(booking.Id)
-            ? _bookings.TryUpdate(booking.Id, booking, _bookings[booking.Id])
-                ? Task.FromResult(true)
-                : Task.FromResult(false)
-            : Task.FromResult(false);
+        if (booking.Id == Guid.Empty)
+            throw new ArgumentException("Бронь должна иметь валидный Id.", nameof(booking));
+
+        // Проверяем существование
+        if (!_bookings.ContainsKey(booking.Id))
+            return Task.FromResult(false);
+
+        // Полное замещение
+        _bookings[booking.Id] = booking;
+        return Task.FromResult(true);
     }
 }
