@@ -6,17 +6,22 @@ namespace EventMgtApi.Services;
 
 /// <summary>
 /// Интерфейс для сервиса управления событиями.
-/// Определяет основные операции: добавление, получение, обновление и удаление событий.
+/// Определяет асинхронные операции: получение, добавление, обновление и удаление событий.
 /// </summary>
 public interface IEventService
 {
     /// <summary>
-    /// Возвращает список всех событий.
+    /// Асинхронно возвращает список всех событий с пагинацией и фильтрацией.
     /// </summary>
-    ///<returns>
-    /// Экземпляр<see cref = "PaginatedResult{T}" />, содержащий отфильтрованные и разбитые на страницы события.
-    ///</returns>
-    PaginatedResult<EventDtoResponse> GetEvents(
+    /// <param name="title">Фильтр по заголовку (опционально).</param>
+    /// <param name="from">Фильтр: события начиная с этой даты (опционально).</param>
+    /// <param name="to">Фильтр: события до этой даты (опционально).</param>
+    /// <param name="page">Номер страницы (по умолчанию 1).</param>
+    /// <param name="pageSize">Размер страницы (по умолчанию 10).</param>
+    /// <returns>
+    /// Экземпляр <see cref="PaginatedResult{T}" />, содержащий отфильтрованные и разбитые на страницы события.
+    /// </returns>
+    Task<PaginatedResult<EventDtoResponse>> GetEventsAsync(
         string? title = null,
         DateTime? from = null,
         DateTime? to = null,
@@ -24,18 +29,19 @@ public interface IEventService
         int pageSize = 10);
 
     /// <summary>
-    /// Возвращает событие по указанному идентификатору.
+    /// Асинхронно возвращает событие по указанному идентификатору.
     /// </summary>
     /// <param name="id">Идентификатор события для поиска.</param>
     /// <returns>
-    /// Копия найденного события в виде <see cref="EventDtoResponse"/>.</returns>
+    /// Копия найденного события в виде <see cref="EventDtoResponse"/>.
+    /// </returns>
     /// <exception cref="NotFoundException">
     /// Исключение выбрасывается, если событие с указанным <paramref name="id"/> не найдено.
     /// </exception>   
-    EventDtoResponse GetEvent(Guid id);
+    Task<EventDtoResponse> GetEventAsync(Guid id);
 
     /// <summary>
-    /// Добавляет новое событие.
+    /// Асинхронно добавляет новое событие.
     /// </summary>
     /// <param name="evtDto">Данные события, которое необходимо добавить. Не должно быть null.</param>
     /// <returns>Возвращает копию добавленного события в виде <see cref="EventDtoResponse"/>.</returns>
@@ -47,10 +53,10 @@ public interface IEventService
     ///   <item><description>Дата начала не меньше даты окончания.</description></item>
     /// </list>
     /// </exception>
-    EventDtoResponse AddEvent(EventDto evtDto);
+    Task<EventDtoResponse> AddEventAsync(EventDto evtDto);
 
     /// <summary>
-    /// Обновляет существующее событие по указанному идентификатору.
+    /// Асинхронно обновляет существующее событие по указанному идентификатору.
     /// </summary>
     /// <param name="id">Уникальный идентификатор события для обновления.</param>
     /// <param name="evtDto">Новые данные события. Не должен быть <see langword="null"/>.</param>
@@ -68,14 +74,15 @@ public interface IEventService
     /// <exception cref="NotFoundException">
     /// Выбрасывается, если событие с указанным <paramref name="id"/> не найдено.
     /// </exception>
-    EventDtoResponse UpdateEvent(Guid id, EventDto evtDto);
+    Task<EventDtoResponse> UpdateEventAsync(Guid id, EventDto evtDto);
 
     /// <summary>
-    /// Удаляет событие по указанному идентификатору.
+    /// Асинхронно удаляет событие по указанному идентификатору.
     /// </summary>
     /// <param name="id">Идентификатор события, которое необходимо удалить.</param>
+    /// <returns>Задача, представляющая асинхронную операцию удаления.</returns>
     /// <exception cref="NotFoundException">
     /// Выбрасывается, если событие с указанным <paramref name="id"/> не найдено.
     /// </exception>
-    void RemoveEvent(Guid id);
+    Task RemoveEventAsync(Guid id);
 }

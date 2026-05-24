@@ -1,7 +1,9 @@
-﻿using EventMgtApi.Extensions;
+﻿using EventMgtApi.Exceptions;
+using EventMgtApi.Extensions;
 using EventMgtApi.Models.Dto;
 using EventMgtApi.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
 
 namespace EventMgtApi.Controllers;
 
@@ -33,14 +35,14 @@ public class EventsController : ControllerBase
     /// </returns>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResult<EventDtoResponse>), StatusCodes.Status200OK)]
-    public IActionResult GetEvents(
+    public async Task<ActionResult<PaginatedResult<EventDtoResponse>>> GetEvents(
         [FromQuery] string? title = null,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
-        var result = _eventService.GetEvents(title, from, to, page, pageSize);
+        var result = await _eventService.GetEventsAsync(title, from, to, page, pageSize);
         return Ok(result);
     }
 
@@ -57,10 +59,24 @@ public class EventsController : ControllerBase
     [ProducesResponseType(typeof(EventDtoResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult GetEvent(Guid id)
+    public async Task<ActionResult<EventDtoResponse>> GetEvent(Guid id)
     {
-        var evt = _eventService.GetEvent(id);
-        return Ok(evt);
+        if (id == Guid.Empty)
+            return BadRequest("Идентификатор события не может быть пустым.");
+
+        try
+        {
+            var evt = await _eventService.GetEventAsync(id);
+            return Ok(evt);
+        }
+        catch (NotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ArgumentNullException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     /// <summary>
@@ -74,15 +90,29 @@ public class EventsController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(EventDtoResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult AddEvent([FromBody] EventDto evtDto)
+    public async Task<ActionResult<EventDtoResponse>> AddEvent([FromBody] EventDto evtDto)
     {
-        var addedEvent = _eventService.AddEvent(evtDto);
+        if (evtDto == null)
+            return BadRequest("Тело запроса не может быть null.");
 
-        return CreatedAtAction(
-            nameof(GetEvent),
-            new { id = addedEvent.Id },
-            addedEvent
-        );
+        try
+        {
+            var addedEvent = await _eventService.AddEventAsync(evtDto);
+
+            return CreatedAtAction(
+                nameof(GetEvent),
+                new { id = addedEvent.Id },
+                addedEvent
+            );
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentNullException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     /// <summary>
@@ -100,10 +130,26 @@ public class EventsController : ControllerBase
     [ProducesResponseType(typeof(EventDtoResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult UpdateEvent(Guid id, [FromBody]EventDto evtDto)
+    public async Task<ActionResult<EventDtoResponse>> UpdateEvent(Guid id, [FromBody] EventDto evtDto)
     {
-        var updatedEvent = _eventService.UpdateEvent(id, evtDto);
-        return Ok(updatedEvent);
+        if (id == Guid.Empty)
+            return BadRequest("Идентификатор события не может быть пустым.");
+
+        if (evtDto == null)
+            return BadRequest("Тело запроса не может быть null.");
+        try
+        {
+            var updatedEvent = await _eventService.UpdateEventAsync(id, evtDto);
+            return Ok(updatedEvent);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (NotFoundException)
+        {
+            return NotFound();
+        }
     }
 
     /// <summary>
@@ -119,9 +165,16 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult RemoveEvent(Guid id)
+    public async Task<IActionResult> RemoveEvent(Guid id)
     {
-        _eventService.RemoveEvent(id); // выбросит NotFoundException, если не найдено
-        return NoContent();
+        try
+        {
+            await _eventService.RemoveEventAsync(id);
+            return NoContent();
+        }
+        catch (NotFoundException)
+        {
+            return NotFound();
+        }
     }
 }

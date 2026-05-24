@@ -67,10 +67,10 @@ public class EventServiceTests
 
     [Theory]
     [MemberData(nameof(ValidEventDtos))]
-    public void CreateEvent_ValidEvent_ReturnsCreatedEventWithId(EventDto inputEvent, string expectedDescription)
+    public async Task CreateEvent_ValidEvent_ReturnsCreatedEventWithId(EventDto inputEvent, string expectedDescription)
     {
         // Act
-        var result = _service.AddEvent(inputEvent);
+        var result = await _service.AddEventAsync(inputEvent);
 
         // Assert
         result.Should().NotBeNull("потому что сервис должен возвращать результат");
@@ -85,7 +85,7 @@ public class EventServiceTests
     /// Проверяет, что при пустом заголовке выбрасывается ValidationException с корректным сообщением.
     /// </summary>
     [Fact]
-    public void AddEvent_TitleEmpty_ThrowsValidationException()
+    public async Task AddEvent_TitleEmpty_ThrowsValidationException()
     {
         // Arrange
         var dto = new EventDto
@@ -96,11 +96,12 @@ public class EventServiceTests
         };
 
         // Act & Assert
-        var exception = _service.Invoking(s => s.AddEvent(dto))
-                               .Should().Throw<ValidationException>()
-                               .Which;
+        var exception = await _service
+            .Invoking(s => s.AddEventAsync(dto))
+            .Should().ThrowAsync<ValidationException>();
 
-        exception.Message.Should().Be("Заголовок обязателен.");
+        // Дополнительная проверка сообщения
+        exception.Which.Message.Should().Contain("Заголовок обязателен.");
     }
 
     /// <summary>
@@ -108,7 +109,7 @@ public class EventServiceTests
     /// выбрасывается ValidationException с корректным сообщением.
     /// </summary>
     [Fact]
-    public void AddEvent_StartAfterEnd_ThrowsValidationException()
+    public async Task AddEvent_StartAfterEnd_ThrowsValidationException()
     {
         // Arrange
         var dto = new EventDto
@@ -119,9 +120,10 @@ public class EventServiceTests
         };
 
         // Act & Assert
-        _service.Invoking(s => s.AddEvent(dto))
-                .Should().Throw<ValidationException>()
-                .WithMessage("Дата начала должна быть раньше даты окончания.");
+        await _service
+            .Invoking(s => s.AddEventAsync(dto))
+            .Should().ThrowAsync<ValidationException>()
+            .WithMessage("Дата начала должна быть раньше даты окончания.");
     }
 
     // ========================================================================
@@ -130,18 +132,18 @@ public class EventServiceTests
     // Проверяет, что все добавленные события возвращаются с правильной пагинацией
 
     [Fact]
-    public void GetAllEvents_AfterAddingEvents_ReturnsAllAddedEvents()
+    public async Task GetAllEvents_AfterAddingEvents_ReturnsAllAddedEvents()
     {
         // Arrange
         var eventsToAdd = ValidEventDtos().Select(data => (EventDto)data[0]).ToList();
 
         foreach (var evt in eventsToAdd)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         // Act
-        var result = _service.GetEvents();
+        var result = await _service.GetEventsAsync();
 
         // Assert
         Assert.Equal(3, result.TotalCount);
@@ -160,17 +162,17 @@ public class EventServiceTests
     // Проверяет, что существующее событие возвращается корректно
 
     [Fact]
-    public void GetEventById_ExistingId_ReturnsEvent()
+    public async Task GetEventById_ExistingId_ReturnsEvent()
     {
         // Arrange
         var testEventDto = ValidEventDtos().First();
         var inputEvent = (EventDto)testEventDto[0];
 
-        var addedEvent = _service.AddEvent(inputEvent);
+        var addedEvent = await _service.AddEventAsync(inputEvent);
         var id = addedEvent.Id;
 
         // Act
-        var result = _service.GetEvent(id);
+        var result = await _service.GetEventAsync(id);
 
         // Assert
         Assert.NotNull(result);
@@ -183,17 +185,17 @@ public class EventServiceTests
 
     // Проверяет, что при отсутствии события выбрасывается NotFoundException
     [Fact]
-    public void GetEvent_NonExistingId_ThrowsNotFoundException()
+    public async Task GetEvent_NonExistingId_ThrowsNotFoundException()
     {
         // Arrange
         var nonExistingId = Guid.NewGuid();
 
         // Act & Assert
-        var exception = Assert.Throws<NotFoundException>(() =>
-            _service.GetEvent(nonExistingId)
-        );
+        var exception = await Assert.ThrowsAsync<NotFoundException>
+                (async () => await _service.GetEventAsync(nonExistingId));
 
-        Assert.Contains($"Событие с ID {nonExistingId} не найдено", exception.Message);
+
+    Assert.Contains($"Событие с ID {nonExistingId} не найдено", exception.Message);
     }
 
     // ========================================================================
@@ -202,11 +204,11 @@ public class EventServiceTests
     // Проверяет, что событие обновляется с новыми валидными данными
 
     [Fact]
-    public void UpdateEvent_ExistingIdAndValidData_UpdatesAndReturnsEvent()
+    public async Task UpdateEvent_ExistingIdAndValidData_UpdatesAndReturnsEvent()
     {
         // Arrange
         // Берём первое событие из ValidEventDtos для создания
-        var addedEvent = _service.AddEvent((EventDto)ValidEventDtos().First()[0]!);
+        var addedEvent = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var id = addedEvent.Id;
 
         // Событие для обновления (новые данные)
@@ -219,7 +221,7 @@ public class EventServiceTests
         };
 
         // Act
-        var result = _service.UpdateEvent(id, updateDto);
+        var result = await _service.UpdateEventAsync(id, updateDto);
 
         // Assert
         Assert.NotNull(result);
@@ -232,22 +234,22 @@ public class EventServiceTests
 
     // Проверяет валидацию: пустой заголовок при обновлении → ошибка
     [Fact]
-    public void UpdateEvent_EmptyTitle_ThrowsValidationException()
+    public async Task UpdateEvent_EmptyTitle_ThrowsValidationException()
     {
         // Arrange
-        var added = _service.AddEvent((EventDto)ValidEventDtos().First()[0]!);
+        var added = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var updateDto = new EventDto { Title = string.Empty };
 
         // Act & Assert
-        Assert.Throws<ValidationException>(() => _service.UpdateEvent(added.Id, updateDto));
+        await Assert.ThrowsAsync<ValidationException>(async () => await _service.UpdateEventAsync(added.Id, updateDto));
     }
 
     // Проверяет валидацию: StartAfterEnd при обновлении → ошибка
     [Fact]
-    public void UpdateEvent_StartAfterEnd_ThrowsValidationException()
+    public async Task UpdateEvent_StartAfterEnd_ThrowsValidationException()
     {
         // Arrange
-        var added = _service.AddEvent((EventDto)ValidEventDtos().First()[0]!);
+        var added = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var updateDto = new EventDto
         {
             Title = "Тест",
@@ -256,19 +258,19 @@ public class EventServiceTests
         };
 
         // Act & Assert
-        Assert.Throws<ValidationException>(() => _service.UpdateEvent(added.Id, updateDto));
+        await Assert.ThrowsAsync<ValidationException>(async () => await _service.UpdateEventAsync(added.Id, updateDto));
     }
 
     // Проверяет: обновление несуществующего ID → ошибка
     [Fact]
-    public void UpdateEvent_NonExistingId_ThrowsNotFoundException()
+    public async Task UpdateEvent_NonExistingId_ThrowsNotFoundException()
     {
         // Arrange
         var updateDto = new EventDto { Title = "Тест", StartAt = DateTime.UtcNow, EndAt = DateTime.UtcNow.AddHours(1) };
         var nonExistingId = Guid.NewGuid();
 
         // Act & Assert
-        var ex = Assert.Throws<NotFoundException>(() => _service.UpdateEvent(nonExistingId, updateDto));
+        var ex = await Assert.ThrowsAsync<NotFoundException>(async () => await _service.UpdateEventAsync(nonExistingId, updateDto));
         Assert.Contains("не найдено", ex.Message);
     }
 
@@ -278,31 +280,31 @@ public class EventServiceTests
     // Проверяет, что событие удаляется и больше не доступно
 
     [Fact]
-    public void DeleteEvent_ExistingId_DeletesEvent()
+    public async Task DeleteEvent_ExistingId_DeletesEvent()
     {
         // Arrange
         // Добавляем событие, чтобы получить реальный ID
-        var addedEvent = _service.AddEvent((EventDto)ValidEventDtos().First()[0]!);
+        var addedEvent = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var id = addedEvent.Id;
 
         // Act
-        _service.RemoveEvent(id);
+        await _service.RemoveEventAsync(id);
 
         // Assert
-        var exception = Assert.Throws<NotFoundException>(() => _service.GetEvent(id));
+        var exception = await Assert.ThrowsAsync<NotFoundException>(async () => await _service.GetEventAsync(id));
         Assert.Contains($"Событие с ID {id} не найдено", exception.Message);
     }
 
     // Проверяет: удаление несуществующего ID → ошибка
     [Fact]
-    public void RemoveEvent_NonExistingId_ThrowsNotFoundException()
+    public async Task RemoveEvent_NonExistingId_ThrowsNotFoundException()
     {
         // Arrange
         var nonExistingId = Guid.NewGuid();
 
         // Act & Assert
-        var exception = Assert.Throws<NotFoundException>(() =>
-            _service.RemoveEvent(nonExistingId)
+        var exception = await Assert.ThrowsAsync<NotFoundException>
+                (async () => await _service.RemoveEventAsync(nonExistingId)
         );
 
         Assert.Contains("не найдено", exception.Message);
@@ -314,20 +316,20 @@ public class EventServiceTests
     // Проверяет частичное, регистронезависимое совпадение по заголовку
 
     [Fact]
-    public void GetEvents_TitleFilter_MatchesPartialAndCaseInsensitive()
+    public async Task GetEvents_TitleFilter_MatchesPartialAndCaseInsensitive()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
 
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count(e => e.Title?.Contains("план", StringComparison.OrdinalIgnoreCase) == true);
 
         // Act
-        var result = _service.GetEvents(title: "план");
+        var result = await _service.GetEventsAsync(title: "план");
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -338,19 +340,19 @@ public class EventServiceTests
 
     // Проверяет: title = null → возвращает всё
     [Fact]
-    public void GetEvents_TitleFilter_Null_ReturnsAllEvents()
+    public async Task GetEvents_TitleFilter_Null_ReturnsAllEvents()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count;
 
         // Act
-        var result = _service.GetEvents(title: null);
+        var result = await _service.GetEventsAsync(title: null);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -359,19 +361,19 @@ public class EventServiceTests
 
     // Проверяет: title = "" → возвращает всё
     [Fact]
-    public void GetEvents_TitleFilter_EmptyString_ReturnsAllEvents()
+    public async Task GetEvents_TitleFilter_EmptyString_ReturnsAllEvents()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count;
 
         // Act
-        var result = _service.GetEvents(title: string.Empty);
+        var result = await _service.GetEventsAsync(title: string.Empty);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -380,19 +382,19 @@ public class EventServiceTests
 
     // Проверяет: title = пробелы → возвращает всё
     [Fact]
-    public void GetEvents_TitleFilter_WhitespaceOnly_ReturnsAllEvents()
+    public async Task GetEvents_TitleFilter_WhitespaceOnly_ReturnsAllEvents()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count;
 
         // Act
-        var result = _service.GetEvents(title: "   ");
+        var result = await _service.GetEventsAsync(title: "   ");
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -401,17 +403,17 @@ public class EventServiceTests
 
     // Проверяет: нет совпадений → пустой результат
     [Fact]
-    public void GetEvents_TitleFilter_NoMatchingTitle_ReturnsEmptyList()
+    public async Task GetEvents_TitleFilter_NoMatchingTitle_ReturnsEmptyList()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         // Act
-        var result = _service.GetEvents(title: "несуществующее");
+        var result = await _service.GetEventsAsync(title: "несуществующее");
 
         // Assert
         Assert.Equal(0, result.TotalCount);
@@ -424,13 +426,13 @@ public class EventServiceTests
     // Проверяет фильтр "от" — события, начинающиеся не раньше указанной даты
 
     [Fact]
-    public void GetEvents_FromFilter_ReturnsEventsStartingAfterOrAt()
+    public async Task GetEvents_FromFilter_ReturnsEventsStartingAfterOrAt()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var from = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
@@ -438,7 +440,7 @@ public class EventServiceTests
         var expectedCount = testEvents.Count(e => e.StartAt >= from);
 
         // Act
-        var result = _service.GetEvents(from: from);
+        var result = await _service.GetEventsAsync(from: from);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -448,13 +450,13 @@ public class EventServiceTests
 
     // Проверяет фильтр "до" — события, заканчивающиеся не позже
     [Fact]
-    public void GetEvents_ToFilter_ReturnsEventsEndingBeforeOrAt()
+    public async Task GetEvents_ToFilter_ReturnsEventsEndingBeforeOrAt()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var to = new DateTime(2026, 5, 15, 23, 59, 59, DateTimeKind.Utc);
@@ -462,7 +464,7 @@ public class EventServiceTests
         var expectedCount = testEvents.Count(e => e.EndAt <= to);
 
         // Act
-        var result = _service.GetEvents(to: to);
+        var result = await _service.GetEventsAsync(to: to);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -472,13 +474,13 @@ public class EventServiceTests
 
     // Проверяет комбинацию from + to
     [Fact]
-    public void GetEvents_FromAndToFilter_ReturnsEventsInDateRange()
+    public async Task GetEvents_FromAndToFilter_ReturnsEventsInDateRange()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var from = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
@@ -487,7 +489,7 @@ public class EventServiceTests
         var expectedCount = testEvents.Count(e => e.StartAt >= from && e.EndAt <= to);
 
         // Act
-        var result = _service.GetEvents(from: from, to: to);
+        var result = await _service.GetEventsAsync(from: from, to: to);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -501,19 +503,19 @@ public class EventServiceTests
 
     // Проверяет: from в будущем → пусто
     [Fact]
-    public void GetEvents_FromFilter_FutureDate_ReturnsEmptyList()
+    public async Task GetEvents_FromFilter_FutureDate_ReturnsEmptyList()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         var from = DateTime.UtcNow.AddYears(10); // далеко в будущем
 
         // Act
-        var result = _service.GetEvents(from: from);
+        var result = await _service.GetEventsAsync(from: from);
 
         // Assert
         Assert.Equal(0, result.TotalCount);
@@ -526,7 +528,7 @@ public class EventServiceTests
     // Проверяет вторую страницу при pageSize=2
 
     [Fact]
-    public void GetEvents_Pagination_Page2_Size2_ReturnsCorrectSubset()
+    public async Task GetEvents_Pagination_Page2_Size2_ReturnsCorrectSubset()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
@@ -534,7 +536,7 @@ public class EventServiceTests
         // Убедимся, что все события добавлены
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         // Ожидаем: pageSize = 2 → страница 1: 2 события, страница 2: 1 событие
@@ -542,7 +544,7 @@ public class EventServiceTests
         const int pageSize = 2;
 
         // Act
-        var result = _service.GetEvents(page: page, pageSize: pageSize);
+        var result = await _service.GetEventsAsync(page: page, pageSize: pageSize);
 
         // Assert
         Assert.Equal(3, result.TotalCount);       // Всего 3 события
@@ -553,17 +555,17 @@ public class EventServiceTests
 
     // Проверяет первую страницу
     [Fact]
-    public void GetEvents_Pagination_Page1_Size2_ReturnsFirstTwoItems()
+    public async Task GetEvents_Pagination_Page1_Size2_ReturnsFirstTwoItems()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         // Act
-        var result = _service.GetEvents(page: 1, pageSize: 2);
+        var result = await _service.GetEventsAsync(page: 1, pageSize: 2);
 
         // Assert
         Assert.Equal(3, result.TotalCount);
@@ -574,17 +576,17 @@ public class EventServiceTests
 
     // Проверяет нормализацию: page=0 → page=1
     [Fact]
-    public void GetEvents_Pagination_Page0_ReturnsFirstPage()
+    public async Task GetEvents_Pagination_Page0_ReturnsFirstPage()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         // Act
-        var result = _service.GetEvents(page: 0, pageSize: 2);
+        var result = await _service.GetEventsAsync(page: 0, pageSize: 2);
 
         // Assert
         Assert.Equal(1, result.Page);
@@ -595,17 +597,17 @@ public class EventServiceTests
 
     // Проверяет нормализацию: pageSize=0 → pageSize=1
     [Fact]
-    public void GetEvents_PageSize0_NormalizesTo1()
+    public async Task GetEvents_PageSize0_NormalizesTo1()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            _service.AddEvent(evt);
+            await _service.AddEventAsync(evt);
         }
 
         // Act
-        var result = _service.GetEvents(page: 1, pageSize: 0);
+        var result = await _service.GetEventsAsync(page: 1, pageSize: 0);
 
         // Assert
         Assert.Equal(1, result.PageSize);
@@ -614,12 +616,12 @@ public class EventServiceTests
 
     // Проверяет ограничение: pageSize=150 → pageSize=100
     [Fact]
-    public void GetEvents_PageSize150_NormalizesTo100()
+    public async Task GetEvents_PageSize150_NormalizesTo100()
     {
         // Arrange
         for (int i = 0; i < 50; i++)
         {
-            _service.AddEvent(new EventDto
+            await _service.AddEventAsync(new EventDto
             {
                 Title = $"Событие {i}",
                 StartAt = DateTime.UtcNow.AddDays(i),
@@ -628,7 +630,7 @@ public class EventServiceTests
         }
 
         // Act
-        var result = _service.GetEvents(page: 1, pageSize: 150);
+        var result = await _service.GetEventsAsync(page: 1, pageSize: 150);
 
         // Assert
         Assert.Equal(100, result.PageSize);
@@ -641,14 +643,14 @@ public class EventServiceTests
     // Проверяет одновременное применение фильтров: title + from + to
 
     [Fact]
-    public void GetEvents_CombinedFilters_ReturnsIntersection()
+    public async Task GetEvents_CombinedFilters_ReturnsIntersection()
     {
         // Arrange
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
 
         foreach (var testEvent in testEvents)
         {
-            _service.AddEvent(testEvent);
+            await _service.AddEventAsync(testEvent);
         }
 
         var from = new DateTime(2026, 5, 14, 9, 0, 0, DateTimeKind.Utc);
@@ -656,7 +658,7 @@ public class EventServiceTests
         var title = "встреча";
 
         // Act
-        var result = _service.GetEvents(title: title, from: from, to: to);
+        var result = await _service.GetEventsAsync(title: title, from: from, to: to);
 
         // Assert
         Assert.Single(result.Items);

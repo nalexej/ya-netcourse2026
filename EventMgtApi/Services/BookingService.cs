@@ -35,8 +35,7 @@ public class BookingService : IBookingService
             throw new ArgumentException("Идентификатор события не может быть пустым.", nameof(eventId));
 
         // Проверяем, существует ли событие
-        //var @event = await _eventRepository.GetByIdAsync(eventId);
-        var @event = _eventRepository.GetById(eventId);
+        var @event = await _eventRepository.GetByIdAsync(eventId);
         if (@event == null)
             throw new NotFoundException($"Событие с ID {eventId} не найдено.");
 

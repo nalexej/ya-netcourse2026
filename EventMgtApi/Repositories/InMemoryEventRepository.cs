@@ -1,4 +1,8 @@
 ﻿using EventMgtApi.Models;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace EventMgtApi.Repositories
 {
@@ -9,90 +13,54 @@ namespace EventMgtApi.Repositories
     /// </summary>
     public class InMemoryEventRepository : IEventRepository
     {
-        private readonly List<Event> _events = new();
-        private readonly object _lock = new();
+        private readonly ConcurrentDictionary<Guid, Event> _events = new();
 
-        /// <summary>
-        /// Возвращает копию всех событий.
-        /// </summary>
-        /// <returns>Список всех событий.</returns>
-        public List<Event> GetAll()
+        /// <inheritdoc />
+        public Task<List<Event>> GetAllAsync()
         {
-            lock (_lock)
-            {
-                return [.. _events];
-            }
+            var events = _events.Values.ToList();
+            return Task.FromResult(events);
         }
 
-        /// <summary>
-        /// Ищет событие по идентификатору.
-        /// </summary>
-        /// <param name="id">Идентификатор события.</param>
-        /// <returns>Найденное событие или <see langword="null"/>, если не найдено.</returns>
-        public Event? GetById(Guid id)
+        /// <inheritdoc />
+        public Task<Event?> GetByIdAsync(Guid id)
         {
-            lock (_lock)
-            {
-                return _events.FirstOrDefault(e => e.Id == id);
-            }
+            return Task.FromResult(_events.TryGetValue(id, out var @event) ? @event : null);
         }
 
-        /// <summary>
-        /// Добавляет новое событие в хранилище.
-        /// </summary>
-        /// <param name="event">Событие для добавления. Должно быть ненулевым.</param>
-        public void Add(Event @event)
+        /// <inheritdoc />
+        public Task AddAsync(Event @event)
         {
-            lock (_lock)
-            {
-                _events.Add(@event);
-            }
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
+
+            _events[@event.Id] = @event;
+            return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Обновляет существующее событие по Id.
-        /// </summary>
-        /// <param name="event">Событие с обновлёнными данными. Должно иметь существующий Id.</param>
-        /// <returns><see langword="true"/>, если событие найдено и обновлено; иначе <see langword="false"/>.</returns>
-        public bool Update(Event @event)
+        /// <inheritdoc />
+        public Task<bool> UpdateAsync(Event @event)
         {
-            lock (_lock)
-            {
-                var index = _events.FindIndex(e => e.Id == @event.Id);
-                if (index == -1) return false;
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
 
-                _events[index] = @event;
-                return true;
-            }
+            return _events.ContainsKey(@event.Id) && _events.TryUpdate(@event.Id, @event, _events[@event.Id])
+                ? Task.FromResult(true)
+                : Task.FromResult(false);
         }
 
-        /// <summary>
-        /// Удаляет событие по идентификатору.
-        /// </summary>
-        /// <param name="id">Идентификатор удаляемого события.</param>
-        /// <returns><see langword="true"/>, если событие удалено; иначе <see langword="false"/>.</returns>
-        public bool Delete(Guid id)
+        /// <inheritdoc />
+        public Task<bool> DeleteAsync(Guid id)
         {
-            lock (_lock)
-            {
-                var index = _events.FindIndex(e => e.Id == id);
-                if (index == -1) return false;
-
-                _events.RemoveAt(index);
-                return true;
-            }
+            return _events.TryRemove(id, out _)
+                ? Task.FromResult(true)
+                : Task.FromResult(false);
         }
 
-        /// <summary>
-        /// Возвращает общее количество событий в хранилище.
-        /// </summary>
-        /// <returns>Число событий.</returns>
-        public int Count()
+        /// <inheritdoc />
+        public Task<int> CountAsync()
         {
-            lock (_lock)
-            {
-                return _events.Count;
-            }
+            return Task.FromResult(_events.Count);
         }
     }
 }
