@@ -17,10 +17,16 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ThrowValidationExceptionFilter>();
+})
+.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
+
 builder.Services.AddSingleton<IEventRepository, InMemoryEventRepository>();
 builder.Services.AddSingleton<IEventService, EventService>();
 builder.Services.AddSingleton<IBookingRepository, InMemoryBookingRepository>();
+builder.Services.AddScoped<IBookingService, BookingService>();
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();

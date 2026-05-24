@@ -10,24 +10,24 @@ public class Booking
     /// <summary>
     /// Уникальный идентификатор брони.
     /// </summary>
-    public required Guid Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>
     /// Идентификатор события, к которому относится бронь.
     /// </summary>
-    public required Guid EventId { get; set; }
+    public Guid EventId { get; set; }
 
     /// <summary>
     /// Текущий статус брони.
     /// </summary>
-    public required BookingStatus Status { get; set; }
+    public BookingStatus Status { get; set; } = BookingStatus.Pending;
 
     /// <summary>
     /// Дата и время создания брони.
     /// </summary>
-    public required DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
+    /// <summary>l
     /// Дата и время обработки брони (может быть null).
     /// </summary>
     public DateTime? ProcessedAt { get; set; }
@@ -38,14 +38,6 @@ public class Booking
     /// <param name="eventId">Идентификатор события, для которого создаётся бронь.</param>
     public Booking(Guid eventId)
     {
-        Id = Guid.NewGuid();
         EventId = eventId;
-        Status = BookingStatus.Pending;
-        CreatedAt = DateTime.UtcNow;
     }
-
-    /// <summary>
-    /// Приватный конструктор для ORM/сериализаторов.
-    /// </summary>
-    private Booking() { }
 }
