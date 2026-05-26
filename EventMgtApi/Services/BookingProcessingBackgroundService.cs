@@ -7,55 +7,140 @@ using System.Threading.Tasks;
 
 /// <summary>
 /// Фоновый сервис, периодически обрабатывающий брони со статусом Pending.
+/// Выполняет автоматическое подтверждение броней с задержкой.
+/// Сервис корректно реагирует на отмену и логирует жизненный цикл.
 /// </summary>
 public class BookingProcessingBackgroundService : BackgroundService
 {
     private readonly IBookingRepository _bookingRepository;
-    private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(5); // Период опроса хранилища
+    private readonly ILogger<BookingProcessingBackgroundService> _logger;
+    private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Инициализирует новый экземпляр сервиса с указанным репозиторием бронирований.
+    /// Инициализирует новый экземпляр сервиса с указанным репозиторием и логгером.
     /// </summary>
-    /// <param name="bookingRepository">Репозиторий для доступа к данным о бронях.</param>
-    public BookingProcessingBackgroundService(IBookingRepository bookingRepository)
+    /// <param name="bookingRepository">
+    /// Репозиторий для доступа к данным о бронях. Не должен быть null.
+    /// </param>
+    /// <param name="logger">
+    /// Служба логирования. Используется для записи информации о работе фонового процесса.
+    /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// Выбрасывается, если <paramref name="bookingRepository"/> или <paramref name="logger"/> равны null.
+    /// </exception>
+    public BookingProcessingBackgroundService(
+        IBookingRepository bookingRepository,
+        ILogger<BookingProcessingBackgroundService> logger)
     {
-        _bookingRepository = bookingRepository;
+        _bookingRepository = bookingRepository ?? throw new ArgumentNullException(nameof(bookingRepository));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// Основной цикл фоновой службы.
+    /// Асинхронный метод, представляющий основной цикл фоновой службы.
     /// </summary>
+    /// <param name="stoppingToken">
+    /// Токен, сигнализирующий о запросе остановки приложения.
+    /// Используется для корректного завершения фоновой задачи.
+    /// </param>
+    /// <returns>
+    /// Задача, представляющая выполнение фонового сервиса.
+    /// </returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            // Обрабатываем все ожидающие брони
-            await ProcessPendingBookingsAsync(stoppingToken);
+        _logger.LogInformation("Фоновый сервис обработки броней запущен.");
 
-            // Ждём перед следующей итерацией (или прерываемся при отмене)
-            await Task.Delay(_pollingInterval, stoppingToken);
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await ProcessPendingBookingsAsync(stoppingToken);
+
+                try
+                {
+                    await Task.Delay(_pollingInterval, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    // Ожидание прервано корректной отменой — выходим из цикла
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Неожиданная ошибка в фоновом сервисе");
+            throw;
+        }
+        finally
+        {
+            if (stoppingToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("Фоновый сервис обработки броней остановлен.");
+            }
         }
     }
 
     /// <summary>
-    /// Получает брони в статусе Pending и подтверждает их с задержкой.
+    /// Асинхронно обрабатывает все брони со статусом <see cref="BookingStatus.Pending"/>.
+    /// Для каждой брони:
+    /// - Имитируется внешняя обработка (задержка 2 сек).
+    /// - Статус меняется на <see cref="BookingStatus.Confirmed"/>.
+    /// - Устанавливается <see cref="Booking.ProcessedAt"/>.
+    /// - Обновлённая бронь сохраняется в репозитории.
     /// </summary>
+    /// <param name="stoppingToken">
+    /// Токен отмены. Если активирован, обработка прерывается.
+    /// </param>
+    /// <returns>
+    /// Задача, представляющая асинхронную операцию обработки.
+    /// </returns>
     private async Task ProcessPendingBookingsAsync(CancellationToken stoppingToken)
     {
-        // Получаем все брони, ожидающие обработки
-        var pendingBookings = await _bookingRepository.GetByStatusAsync(BookingStatus.Pending);
-
-        foreach (var booking in pendingBookings)
+        try
         {
-            // Имитация длительной внешней операции (например, интеграция с платёжной системой)
-            await Task.Delay(2000, stoppingToken);
+            var pendingBookings = await _bookingRepository.GetByStatusAsync(BookingStatus.Pending);
 
-            // Подтверждаем бронь
-            booking.Status = BookingStatus.Confirmed;
-            booking.ProcessedAt = DateTime.UtcNow;
+            if (!pendingBookings.Any())
+            {
+                _logger.LogDebug("Нет броней в статусе Pending — пропуск обработки.");
+                return;
+            }
 
-            // Сохраняем обновлённое состояние
-            await _bookingRepository.UpdateAsync(booking);
+            _logger.LogInformation("Найдено {Count} ожидающих броней для обработки.", pendingBookings.Count());
+
+            foreach (var booking in pendingBookings)
+            {
+                if (stoppingToken.IsCancellationRequested)
+                    return;
+
+                try
+                {
+                    await Task.Delay(2000, stoppingToken);
+
+                    booking.Status = BookingStatus.Confirmed;
+                    booking.ProcessedAt = DateTime.UtcNow;
+
+                    var updated = await _bookingRepository.UpdateAsync(booking);
+                    if (!updated)
+                        _logger.LogWarning("Не удалось обновить бронь {BookingId}", booking.Id);
+                    else
+                        _logger.LogDebug("Бронь {BookingId} подтверждена.", booking.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при обработке брони {BookingId}", booking.Id);
+                }
+            }
+
+            _logger.LogInformation("Обработка ожидающих броней завершена.");
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogDebug("Обработка броней прервана отменой.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка при получении броней в статусе Pending");
         }
     }
 }
