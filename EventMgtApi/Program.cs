@@ -1,9 +1,10 @@
-using EventMgtApi.Services;
 using System.Reflection;
-using EventMgtApi.Extensions;
-using EventMgtApi.Filters;
-using EventMgtApi.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using EventMgtApi.Domain.Interfaces;
+using EventMgtApi.Application.Services;
+using EventMgtApi.Infrastructure.Repositories;
+using EventMgtApi.Presentation.Filters;
+using EventMgtApi.Presentation.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 

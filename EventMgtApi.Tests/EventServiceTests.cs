@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Linq;
-using EventMgtApi.Models;
-using EventMgtApi.Models.Dto;
-using EventMgtApi.Services;
-using EventMgtApi.Repositories;
-using EventMgtApi.Exceptions;
 using Xunit;
 using FluentAssertions;
+using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Application.Services;
+using EventMgtApi.Application.DTOs;
+using EventMgtApi.Infrastructure.Repositories;
 
 namespace EventMgtApi.Tests;
 

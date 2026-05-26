@@ -1,5 +1,6 @@
-﻿using EventMgtApi.Models;
-using EventMgtApi.Repositories;
+﻿using EventMgtApi.Domain.Entities;
+using EventMgtApi.Domain.Enums;
+using EventMgtApi.Infrastructure.Repositories;
 using FluentAssertions;
 using System;
 using System.Threading.Tasks;

@@ -1,4 +1,5 @@
-﻿using EventMgtApi.Models;
+﻿using EventMgtApi.Domain.Entities;
+using EventMgtApi.Domain.Enums;
 using FluentAssertions;
 using System;
 using Xunit;

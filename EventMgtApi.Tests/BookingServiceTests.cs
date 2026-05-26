@@ -1,8 +1,10 @@
-﻿using EventMgtApi.Exceptions;
-using EventMgtApi.Models;
-using EventMgtApi.Models.Dto;
-using EventMgtApi.Repositories;
-using EventMgtApi.Services;
+﻿using EventMgtApi.Application.DTOs;
+using EventMgtApi.Application.Services;
+using EventMgtApi.Domain.Entities;
+using EventMgtApi.Domain.Enums;
+using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Domain.Interfaces;
+using EventMgtApi.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
