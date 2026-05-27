@@ -54,11 +54,6 @@ public class BookingServiceTests
         result.Status.Should().Be(BookingStatus.Pending);
         result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
         result.ProcessedAt.Should().BeNull();
-
-        // 🔹 Дополнительно: если бы мы мапили в DTO — проверили бы соответствие
-        var responseDto = MapToDto(result);
-        responseDto?.Id.Should().Be(result.Id);
-        responseDto?.Status.Should().Be(BookingStatus.Pending);
     }
 
     [Fact]
@@ -107,12 +102,6 @@ public class BookingServiceTests
 
         // Assert
         result.Should().BeEquivalentTo(booking);
-
-        // 🔹 Проверка маппинга в DTO (на будущее)
-        var dto = MapToDto(result);
-        dto?.Id.Should().Be(booking.Id);
-        dto?.EventId.Should().Be(booking.EventId);
-        dto?.Status.Should().Be(BookingStatus.Pending);
     }
 
     [Fact]
@@ -122,7 +111,7 @@ public class BookingServiceTests
         var bookingId = Guid.NewGuid();
         var pending = new Booking(eventId: Guid.NewGuid())
         {
-            Id = Guid.NewGuid(),
+            Id = bookingId,
             Status = BookingStatus.Pending,
             CreatedAt = DateTime.UtcNow.AddMinutes(-10),
             ProcessedAt = null
@@ -130,7 +119,7 @@ public class BookingServiceTests
 
         var confirmed = new Booking(eventId: Guid.NewGuid())
         {
-            Id = Guid.NewGuid(),
+            Id = bookingId,
             Status = BookingStatus.Confirmed,
             CreatedAt = DateTime.UtcNow.AddMinutes(-10),
             ProcessedAt = DateTime.UtcNow
@@ -149,11 +138,6 @@ public class BookingServiceTests
         first?.Status.Should().Be(BookingStatus.Pending);
         second?.Status.Should().Be(BookingStatus.Confirmed);
         second?.ProcessedAt.Should().NotBeNull();
-
-        // 🔹 DTO также отражают изменения
-        var dto = MapToDto(second);
-        dto?.Status.Should().Be(BookingStatus.Confirmed);
-        dto?.ProcessedAt.Should().NotBeNull();
     }
 
     // === НЕУСПЕШНЫЕ СЦЕНАРИИ ===
@@ -204,37 +188,19 @@ public class BookingServiceTests
             .WithMessage($"Событие с ID {eventId} не найдено.");
     }
 
+    // Проверяет, что при отсутствии брони выбрасывается NotFoundException
     [Fact]
-    public async Task GetBookingByIdAsync_NonExistingId_ReturnsNull()
+    public async Task GetBookingByIdAsync_NonExistingId_ThrowsNotFoundException()
     {
         // Arrange
-        var id = Guid.NewGuid();
-        _bookingRepoMock.Setup(r => r.GetByIdAsync(id)).ReturnsAsync((Booking?)null);
+        var nonExistingId = Guid.NewGuid();
+        _bookingRepoMock.Setup(r => r.GetByIdAsync(nonExistingId)).ReturnsAsync((Booking?)null);
 
-        // Act
-        var result = await _service.GetBookingByIdAsync(id);
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<NotFoundException>
+                (async () => await _service.GetBookingByIdAsync(nonExistingId));
 
-        // Assert
-        result.Should().BeNull();
+        Assert.Contains($"Бронь с ID {nonExistingId} не найдена", exception.Message);
     }
 
-    // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
-
-    /// <summary>
-    /// Имитирует маппинг модели в DTO — как это будет в контроллере.
-    /// Показывает, что данные корректны для передачи клиенту.
-    /// </summary>
-    private BookingResponseDto? MapToDto(Booking? booking)
-    {
-        if (booking == null) return null;
-
-        return new BookingResponseDto
-        {
-            Id = booking.Id,
-            EventId = booking.EventId,
-            Status = booking.Status,
-            CreatedAt = booking.CreatedAt,
-            ProcessedAt = booking.ProcessedAt
-        };
-    }
 }

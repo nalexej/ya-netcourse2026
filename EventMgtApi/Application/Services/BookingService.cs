@@ -1,4 +1,6 @@
-﻿using EventMgtApi.Domain.Entities;
+﻿using EventMgtApi.Application.DTOs;
+using EventMgtApi.Application.Extensions;
+using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
 using EventMgtApi.Domain.Interfaces;
 using System;
@@ -28,7 +30,7 @@ public class BookingService : IBookingService
     }
 
     /// <inheritdoc />
-    public async Task<Booking> CreateBookingAsync(Guid eventId)
+    public async Task<BookingResponseDto> CreateBookingAsync(Guid eventId)
     {
         if (eventId == Guid.Empty)
             throw new ArgumentException("Идентификатор события не может быть пустым.", nameof(eventId));
@@ -44,15 +46,20 @@ public class BookingService : IBookingService
         // Сохраняем
         await _bookingRepository.AddAsync(booking);
 
-        return booking;
+        return booking.ToDtoResponse();
     }
 
     /// <inheritdoc />
-    public async Task<Booking?> GetBookingByIdAsync(Guid bookingId)
+    public async Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId)
     {
         if (bookingId == Guid.Empty)
             throw new ArgumentException("Идентификатор брони не может быть пустым.", nameof(bookingId));
+        
+        var booking = await _bookingRepository.GetByIdAsync(bookingId);
 
-        return await _bookingRepository.GetByIdAsync(bookingId);
+        if (booking is null)
+            throw new NotFoundException($"Бронь с ID {bookingId} не найдена.");
+
+        return booking.ToDtoResponse();
     }
 }

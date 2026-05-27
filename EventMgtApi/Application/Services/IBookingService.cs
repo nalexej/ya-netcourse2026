@@ -1,7 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
-using EventMgtApi.Domain.Entities;
+﻿using EventMgtApi.Application.DTOs;
+using EventMgtApi.Domain.Exceptions;
 using EventMgtApi.Domain.Enums;
+using System;
+using System.Threading.Tasks;
 
 namespace EventMgtApi.Application.Services;
 
@@ -15,13 +16,14 @@ public interface IBookingService
     /// Статус брони устанавливается в <see cref="BookingStatus.Pending"/>.
     /// </summary>
     /// <param name="eventId">Идентификатор события, для которого создаётся бронь.</param>
-    /// <returns>Созданная бронь.</returns>
-    Task<Booking> CreateBookingAsync(Guid eventId);
+    /// <returns>DTO созданной брони.</returns>
+    Task<BookingResponseDto> CreateBookingAsync(Guid eventId);
 
     /// <summary>
     /// Асинхронно получает бронь по идентификатору.
     /// </summary>
     /// <param name="bookingId">Уникальный идентификатор брони.</param>
-    /// <returns>Найденная бронь или <c>null</c>, если не найдена.</returns>
-    Task<Booking?> GetBookingByIdAsync(Guid bookingId);
+    /// <returns>DTO найденной брони.</returns>
+    /// <exception cref="NotFoundException">Выбрасывается, если бронь с указанным ID не найдена.</exception>
+    Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId);
 }

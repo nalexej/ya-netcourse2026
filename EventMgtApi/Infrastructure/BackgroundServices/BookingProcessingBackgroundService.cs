@@ -6,6 +6,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
+namespace EventMgtApi.Infrastructure.BackgroundServices;
+
 /// <summary>
 /// Фоновый сервис, периодически обрабатывающий брони со статусом Pending.
 /// Выполняет автоматическое подтверждение броней с задержкой.

@@ -8,21 +8,25 @@ namespace EventMgtApi.Presentation.Controllers;
 
 /// <summary>
 /// Контроллер для управления событиями через HTTP API.
-/// Предоставляет операции: получение, добавление, обновление и удаление событий.
+/// Предоставляет операции: получение, добавление, обновление и удаление событий,
+/// а также создание бронирований на события.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService; 
 
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="EventsController"/>.
     /// </summary>
     /// <param name="eventService">Сервис для управления событиями. Не должен быть null.</param>
-    public EventsController(IEventService eventService)
+    /// <param name="bookingService">Сервис для управления бронированиями. Не должен быть null.</param>
+    public EventsController(IEventService eventService, IBookingService bookingService)
     {
         _eventService = eventService ?? throw new ArgumentNullException(nameof(eventService));
+        _bookingService = bookingService ?? throw new ArgumentNullException(nameof(bookingService));
     }
 
     /// <summary>
@@ -174,6 +178,49 @@ public class EventsController : ControllerBase
         catch (NotFoundException)
         {
             return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// Создаёт новую бронь на указанное событие.
+    /// </summary>
+    /// <param name="id">Идентификатор события, на которое создаётся бронь.</param>
+    /// <param name="request">DTO с данными для создания брони (заглушка).</param>
+    /// <returns>Информация о созданной брони.</returns>
+    /// <response code="202">Бронь успешно создана. Возвращён объект и заголовок Location.</response>
+    /// <response code="400">Некорректный запрос.</response>
+    /// <response code="404">Событие с указанным ID не найдено.</response>
+    [HttpPost("{id:guid}/book")]
+    [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<BookingResponseDto>> CreateBookingForEvent
+            (Guid id,
+            [FromBody] CreateBookingRequestDto? request = null) // закладка на будущее
+    {
+        if (id == Guid.Empty)
+            return BadRequest("Идентификатор события не может быть пустым.");
+
+        try
+        {
+            var booking = await _bookingService.CreateBookingAsync(id);
+
+            var locationUri = Url.Action("GetBookingById", "Bookings", new { id = booking.Id }, Request.Scheme);
+            Response.Headers.Location = locationUri;
+
+            return Accepted(booking);
+        }
+        catch (NotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentNullException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 }

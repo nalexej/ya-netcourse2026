@@ -371,6 +371,7 @@ EventMgtApi/
 │   │   ├── CreateBookingRequestDto.cs # Пустой DTO для бронирования
 │   │   └── PaginatedResult.cs   # Обобщённый ответ с пагинацией
 │   └── Extensions/
+│       ├── BookingsMappingExtensions.cs # Метод ToDtoResponse()
 │       └── EventMappingExtensions.cs # Методы ToDtoResponse(), ToDtoList()
 │
 ├── Infrastructure/               # Внешние реализации

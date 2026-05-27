@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Application.Services;
 using EventMgtApi.Infrastructure.Repositories;
+using EventMgtApi.Infrastructure.BackgroundServices;
 using EventMgtApi.Presentation.Filters;
 using EventMgtApi.Presentation.Extensions;
 
