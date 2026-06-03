@@ -35,6 +35,12 @@ namespace EventMgtApi.Application.DTOs;
         [Required(ErrorMessage = "Дата окончания обязательна.")]
         public DateTime? EndAt { get; set; }
 
+        /// <summary>
+        /// Общее количество мест на событии. Обязательное поле.
+        /// Должно быть больше 0.
+        /// </summary>
+        [Range(1, int.MaxValue, ErrorMessage = "TotalSeats должен быть больше 0.")]
+        public int TotalSeats { get; set; }
 
         /// <summary>
         /// Проверяет бизнес-правила для события.

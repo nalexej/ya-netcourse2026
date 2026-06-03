@@ -23,7 +23,9 @@ public static class EventMappingExtensions
             Title = eventEntity.Title,
             Description = eventEntity.Description,
             StartAt = eventEntity.StartAt,
-            EndAt = eventEntity.EndAt
+            EndAt = eventEntity.EndAt,
+            TotalSeats = eventEntity.TotalSeats,
+            AvailableSeats = eventEntity.AvailableSeats
         };
     }
 

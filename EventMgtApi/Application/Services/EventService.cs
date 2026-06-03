@@ -94,20 +94,14 @@ public class EventService : IEventService
         // Дополнительная защита: на случай, если метод вызван без валидации модели
         ArgumentNullException.ThrowIfNull(evtDto, nameof(evtDto));
 
-        if (string.IsNullOrWhiteSpace(evtDto.Title))
-            throw new ValidationException("Заголовок обязателен.");
-
-        var eventEntity = new Event
-        {
-            Id = Guid.NewGuid(),
-            Title = evtDto.Title,
-            Description = evtDto.Description ?? string.Empty,
-            StartAt = evtDto.StartAt ?? throw new ValidationException("Дата начала обязательна."), // Доп. защита
-            EndAt = evtDto.EndAt ?? throw new ValidationException("Дата окончания обязательна.") // Доп. защита
-        };
-
-        if (eventEntity.StartAt >= eventEntity.EndAt)
-            throw new ValidationException("Дата начала должна быть раньше даты окончания."); // Доп. защита
+        // Используем фабричный метод Event.Create с валидацией
+        var eventEntity = Event.Create(
+            title: evtDto.Title,
+            startAt: evtDto.StartAt ?? throw new ValidationException("Дата начала обязательна."),
+            endAt: evtDto.EndAt ?? throw new ValidationException("Дата окончания обязательна."),
+            totalSeats: evtDto.TotalSeats,
+            description: evtDto.Description
+        );
 
         await _repository.AddAsync(eventEntity);
 
@@ -120,20 +114,16 @@ public class EventService : IEventService
         // Дополнительная защита: на случай, если метод вызван без валидации модели
         ArgumentNullException.ThrowIfNull(evtDto, nameof(evtDto));
 
-        if (string.IsNullOrWhiteSpace(evtDto.Title))
-            throw new ValidationException("Заголовок обязателен.");
+        // Используем фабричный метод Event.Create с валидацией
+        var updatedEvent = Event.Create(
+            title: evtDto.Title,
+            startAt: evtDto.StartAt ?? throw new ValidationException("Дата начала обязательна."),
+            endAt: evtDto.EndAt ?? throw new ValidationException("Дата окончания обязательна."),
+            totalSeats: evtDto.TotalSeats,
+            description: evtDto.Description
+        );
 
-        var updatedEvent = new Event
-        {
-            Id = id,
-            Title = evtDto.Title,
-            Description = evtDto.Description ?? string.Empty,
-            StartAt = evtDto.StartAt ?? throw new ValidationException("Дата начала обязательна."), // Доп. защита
-            EndAt = evtDto.EndAt ?? throw new ValidationException("Дата окончания обязательна.") // Доп. защита
-        };
-
-        if (updatedEvent.StartAt >= updatedEvent.EndAt)
-            throw new ValidationException("Дата начала должна быть раньше даты окончания."); // Доп. защита
+        updatedEvent.Id = id;
 
         var success = await _repository.UpdateAsync(updatedEvent);
 
