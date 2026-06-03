@@ -17,10 +17,15 @@ API предоставляет полный цикл операций **CRUD**:
 - ✅ Обновить существующее (`PUT /api/events/{id}`)
 - ✅ Удалить событие (`DELETE /api/events/{id}`)
 
+А также:
+- ✅ Создать бронь на событие (`POST /api/events/{id}/book`)
+- ✅ Проверить статус брони (`GET /api/bookings/{id}`)
+
 С поддержкой:
 - Валидации входных данных,
 - Понятных ошибок на русском языке,
-- Корректных HTTP-статусов (200, 201, 400, 404 и др.).
+- Корректных HTTP-статусов (200, 201, 202, 400, 404 и др.),
+- Фоновой обработки броней.
 
 ---
 
@@ -49,6 +54,7 @@ API предоставляет полный цикл операций **CRUD**:
 - **Потокобезопасность** с `lock`
 - **Swagger UI** — документация API
 - **XML-документация** — для IntelliSense и Swagger
+- **Фоновые службы** — обработка броней
 
 ---
 
@@ -155,38 +161,255 @@ API возвращает ошибки в стандартизированном 
 
 ---
 
-### 📦 Архитектура
+### 🆕 Новые эндпоинты
+
+### 🛒 Создание брони: `POST /api/events/{eventId:guid}/book`
+
+Создаёт новую бронь на указанное событие.  
+Бронь изначально имеет статус `Pending`.
+
+> **HTTP 202 Accepted** — бронь принята в обработку  
+> **Location** — ссылка на `GET /api/bookings/{id}`
+
+#### Пример запроса:
+```http
+POST /api/events/3fa85f64-5717-4562-b3fc-2c963f66afa6/book
+Content-Type: application/json
+```
+
+```json
+{}
+```
+
+> ⚠️ Тело запроса пока пустое (может быть расширено в будущем).
+
+#### Успешный ответ:
+```http
+HTTP/1.1 202 Accepted
+Location: https://localhost:7001/api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
+```
+
+```json
+{
+  "id": "9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a",
+  "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "status": "Pending",
+  "createdAt": "2025-04-05T14:30:00Z",
+  "processedAt": null
+}
+```
+
+---
+
+### 🔍 Проверка статуса брони: `GET /api/bookings/{id:guid}`
+
+Возвращает текущий статус брони по её идентификатору.
+
+> **HTTP 200 OK** — бронь найдена  
+> **HTTP 404 Not Found** — бронь не существует
+
+#### Пример запроса:
+```http
+GET /api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
+```
+
+#### Ответ:
+```json
+{
+  "id": "9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a",
+  "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "status": "Confirmed",
+  "createdAt": "2025-04-05T14:30:00Z",
+  "processedAt": "2025-04-05T14:30:07Z"
+}
+```
+
+---
+
+## 🧩 Модель `Booking` и статусы
+
+### `Booking` — модель бронирования
+- `Id`: `Guid` — уникальный идентификатор брони
+- `EventId`: `Guid` — ссылка на событие
+- `Status`: `BookingStatus` — текущий статус (см. ниже)
+- `CreatedAt`: `DateTime` — когда создана
+- `ProcessedAt`: `DateTime?` — когда обработана (может быть `null`)
+
+### `BookingStatus` — возможные статусы
+```csharp
+public enum BookingStatus
+{
+    /// <summary>Бронь создана, ожидает обработки.</summary>
+    Pending,
+
+    /// <summary>Бронь подтверждена.</summary>
+    Confirmed,
+
+    /// <summary>Бронь отклонена.</summary>
+    Rejected
+}
+```
+
+---
+
+## ⏳ Логика фоновой обработки
+
+Брони со статусом `Pending` обрабатываются фоновым сервисом **в автоматическом режиме**.
+
+### Как это работает:
+- Сервис `BookingProcessingBackgroundService` запускается при старте приложения.
+- Каждые **5 секунд** он:
+  - Ищет все брони со статусом `Pending`
+  - Для каждой:
+    - Ждёт **2 секунды** (имитация внешней системы)
+    - Меняет статус на `Confirmed`
+    - Устанавливает `ProcessedAt = DateTime.UtcNow`
+    - Сохраняет изменения
+
+> 💡 Это имитирует интеграцию с платёжной системой или внешним API.
+
+### Особенности:
+- Потокобезопасен (через `ConcurrentDictionary`)
+- Работает асинхронно
+- Логирует каждый шаг
+- Может быть прерван при остановке приложения
+
+---
+
+## 🎭 Пример сценария использования
+
+### Шаг 1: Создать событие
+```http
+POST /api/events
+Content-Type: application/json
+```
+```json
+{
+  "title": "Конференция .NET",
+  "description": "Ежегодная встреча разработчиков",
+  "startAt": "2026-06-10T09:00:00Z",
+  "endAt": "2026-06-10T18:00:00Z"
+}
+```
+→ Ответ: `201 Created`, ID события — `event-id`
+
+---
+
+### Шаг 2: Забронировать место
+```http
+POST /api/events/event-id/book
+```
+→ Ответ: `202 Accepted`, ID брони — `booking-id`, статус `Pending`
+
+---
+
+### Шаг 3: Проверить статус брони
+```http
+GET /api/bookings/booking-id
+```
+→ Ответ: `200 OK`, статус `Pending`, `processedAt: null`
+
+---
+
+### Шаг 4: Подождать ~7 секунд
+
+Фоновый сервис:
+- Найдёт бронь
+- Обработает её
+- Изменит статус на `Confirmed`
+
+---
+
+### Шаг 5: Проверить статус снова
+```http
+GET /api/bookings/booking-id
+```
+```json
+{
+  "id": "booking-id",
+  "eventId": "event-id",
+  "status": "Confirmed",
+  "createdAt": "2025-04-05T14:30:00Z",
+  "processedAt": "2025-04-05T14:30:07Z"
+}
+```
+
+✅ Бронь подтверждена!
+
+---
+
+### 📦 Архитектура (обновлённая)
+
+Проект построен по принципам **чистой архитектуры (Clean Architecture)** с чётким разделением ответственностей.  
+Структура папок отражает слои приложения, что упрощает масштабирование, тестирование и поддержку.
 
 ```
 EventMgtApi/
-├── Models/
-│   ├── Event.cs           # Внутренняя модель события
-│   └── Dto/
-│       ├── EventDto.cs    # DTO для создания/обновления с валидацией
-│       ├── EventDtoResponse.cs  # DTO ответа (с Id)
-│       └── PaginatedResult.cs   # Обобщённый ответ с пагинацией: TotalCount, Page, PageSize, Items и т.д.
-├── Services/
-│   ├── IEventService.cs   # Интерфейс сервиса управления событиями
-│   └── EventService.cs    # Реализация: in-memory + потокобезопасность
-├── Controllers/
-│   └── EventsController.cs # Обработка HTTP-запросов, маппинг, валидация
-├── Exceptions/
-│   ├── NotFoundException.cs     # Исключение "ресурс не найден" (404)
-│   └── ValidationException.cs   # Исключение валидации (400), сообщения на русском
-├── Middleware/
-│   └── GlobalExceptionHandlingMiddleware.cs # Централизованная обработка исключений
-├── Filters/
-│   └── ThrowValidationExceptionFilter.cs # Преобразует ModelState в ValidationException
-├── Extensions/
-│   ├── EventMappingExtensions.cs        # Методы расширения: ToDtoResponse(), ToDtoList()
-│   └── ApplicationBuilderExtensions.cs  # UseGlobalExceptionHandling() — подключение middleware
-├── Repositories/
-│   ├── IEventRepository.cs              # Интерфейс доступа к данным
-│   └── InMemoryEventRepository.cs       # Потокобезопасная реализация хранилища в памяти
-└── Program.cs             # Настройка DI, маршрутов, Swagger, middleware
-    └── Properties/
-        └── launchSettings.json
+├── Domain/                       # Бизнес-ядро: сущности, интерфейсы, исключения
+│   ├── Entities/
+│   │   ├── Event.cs             # Модель события
+│   │   └── Booking.cs           # Модель бронирования
+│   ├── Enums/
+│   │   └── BookingStatus.cs     # Статусы брони: Pending, Confirmed, Rejected
+│   ├── Exceptions/
+│   │   ├── NotFoundException.cs # Ошибка "не найдено" (404)
+│   │   └── ValidationException.cs # Ошибка валидации (400)
+│   └── Interfaces/
+│       ├── IEventRepository.cs  # Абстракция доступа к событиям
+│       └── IBookingRepository.cs # Абстракция доступа к броням
+│
+├── Application/                  # Логика приложения: сервисы, DTO, маппинг
+│   ├── Services/
+│   │   ├── IEventService.cs     # Интерфейс управления событиями
+│   │   ├── EventService.cs      # Реализация бизнес-логики событий
+│   │   ├── IBookingService.cs   # Интерфейс управления бронями
+│   │   └── BookingService.cs    # Логика создания и получения броней
+│   ├── DTOs/
+│   │   ├── EventDto.cs          # DTO для создания/обновления события
+│   │   ├── EventDtoResponse.cs  # DTO ответа с Id
+│   │   ├── BookingResponseDto.cs # DTO статуса брони
+│   │   ├── CreateBookingRequestDto.cs # Пустой DTO для бронирования
+│   │   └── PaginatedResult.cs   # Обобщённый ответ с пагинацией
+│   └── Extensions/
+│       ├── BookingsMappingExtensions.cs # Метод ToDtoResponse()
+│       └── EventMappingExtensions.cs # Методы ToDtoResponse(), ToDtoList()
+│
+├── Infrastructure/               # Внешние реализации
+│   ├── Repositories/
+│   │   └── InMemoryEventRepository.cs # In-memory реализация репозитория
+│   └── BackgroundServices/
+│       └── BookingProcessingBackgroundService.cs # Обработка Pending → Confirmed
+│
+├── Presentation/                 # Входная точка API
+│   ├── Controllers/
+│   │   ├── EventsController.cs  # Обработка /api/events
+│   │   └── BookingsController.cs # Обработка /api/bookings
+│   ├── Middleware/
+│   │   └── GlobalExceptionHandlingMiddleware.cs # Централизованная обработка ошибок
+│   ├── Filters/
+│   │   └── ThrowValidationExceptionFilter.cs # Преобразует ModelState в исключение
+│   └── Extensions/
+│       └── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
+│
+├── Program.cs                    # Настройка DI, слоёв, маршрутов, Swagger
+└── Properties/
+└── launchSettings.json       # Конфигурация запуска (HTTPS, порт 7001)
 ```
+
+---
+
+#### 🔁 Принципы разделения:
+
+- **Domain** — не зависит ни от чего. Содержит только бизнес-сущности и контракты.
+- **Application** — зависит от `Domain`. Содержит логику, DTO и сервисы.
+- **Infrastructure** — зависит от `Domain` и `Application`. Реализует абстракции (например, репозитории).
+- **Presentation** — зависит от `Application` и `Domain`. Отвечает за HTTP, контроллеры, middleware.
+
+> 💡 Такая структура позволяет:
+> - Легко заменить in-memory хранилище на EF Core или Redis.
+> - Писать изолированные unit-тесты.
+> - Добавлять новые функции без нарушения существующего кода.
+> - Поддерживать проект при росте числа разработчиков.
 
 ---
 
@@ -200,12 +423,12 @@ EventMgtApi/
 ---
 
 ### 🧱 Тесты
-Реализованы unit-тесты для сервиса `EventService`.
+Реализованы unit-тесты для сервисов `EventService` и `BookingService`.
 
 Запуск тестов (в корне репозитория):
 
 ```bash
-dotnet test EventService.Tests/EventService.Tests.csproj
+dotnet test
 ```
 
 ---
@@ -213,9 +436,9 @@ dotnet test EventService.Tests/EventService.Tests.csproj
 ### 🧱 Ограничения
 
 - Данные хранятся в памяти → теряются при перезапуске.
-- `static List<Event>` заменён на потокобезопасный доступ через `lock`.
 - Нет аутентификации или авторизации.
 - Часовые пояса не обрабатываются.
+- Все брони автоматически подтверждаются — нет отказов.
 
 ---
 
@@ -224,6 +447,9 @@ dotnet test EventService.Tests/EventService.Tests.csproj
 - Перейти на EF Core + SQLite для постоянного хранения
 - Добавить маппинг (AutoMapper или ручной)
 - Сделать Docker-образ
+- Реализовать механизм отклонения броней
+- Добавить `PATCH /bookings/{id}/cancel`
+- Интеграция с email и платежами
 
 ---
 
