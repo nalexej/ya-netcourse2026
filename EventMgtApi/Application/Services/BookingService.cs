@@ -15,6 +15,7 @@ public class BookingService : IBookingService
 {
     private readonly IBookingRepository _bookingRepository;
     private readonly IEventRepository _eventRepository;
+    private readonly object _bookingLock = new();
 
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="BookingService"/>.
@@ -35,18 +36,28 @@ public class BookingService : IBookingService
         if (eventId == Guid.Empty)
             throw new ArgumentException("Идентификатор события не может быть пустым.", nameof(eventId));
 
-        // Проверяем, существует ли событие
+        // Получаем событие из репозитория
         var @event = await _eventRepository.GetByIdAsync(eventId);
-        if (@event == null)
+        if (@event is null)
             throw new NotFoundException($"Событие с ID {eventId} не найдено.");
 
-        // Создаём бронь
-        var booking = new Booking(eventId);
+        lock (_bookingLock)
+        {
+            // Пытаемся зарезервировать место
+            if (!@event.TryReserveSeats())
+                throw new NoAvailableSeatsException("Нет доступных мест для данного события.");
 
-        // Сохраняем
-        await _bookingRepository.AddAsync(booking);
+            // Обновляем событие в репозитории
+            _eventRepository.UpdateAsync(@event).Wait(); // добавляем Wait - так поставлена задача
 
-        return booking.ToDtoResponse();
+            // Создаём бронь
+            var booking = new Booking(eventId);
+
+            // Сохраняем бронь
+            _bookingRepository.AddAsync(booking).Wait(); 
+
+            return booking.ToDtoResponse();
+        }
     }
 
     /// <inheritdoc />

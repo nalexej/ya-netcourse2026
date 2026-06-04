@@ -7,7 +7,7 @@ namespace EventMgtApi.Presentation.Middleware;
 
 /// <summary>
 /// Middleware для глобальной обработки исключений.
-/// Перехватывает <see cref="ValidationException"/>, <see cref="NotFoundException"/> и необработанные исключения,
+/// Перехватывает <see cref="ValidationException"/>, <see cref="NotFoundException"/>, <see cref="NoAvailableSeatsException"/> и необработанные исключения,
 /// возвращая стандартизированный ответ в формате <see cref="ProblemDetails"/>.
 /// </summary>
 public class GlobalExceptionHandlingMiddleware
@@ -53,7 +53,8 @@ public class GlobalExceptionHandlingMiddleware
     /// <remarks>
     /// Метод использует pattern matching для определения типа исключения и делегирует дальнейшую обработку 
     /// соответствующему обработчику: <see cref="HandleValidationExceptionAsync"/>, 
-    /// <see cref="HandleNotFoundExceptionAsync"/> или <see cref="HandleInternalServerErrorAsync"/>.
+    /// <see cref="HandleNotFoundExceptionAsync"/>, <see cref="HandleNoAvailableSeatsExceptionAsync"/>
+    /// или <see cref="HandleInternalServerErrorAsync"/>.
     /// </remarks>
     private async Task HandleExceptionAsync(HttpContext httpContext, Exception exception)
     {
@@ -64,6 +65,7 @@ public class GlobalExceptionHandlingMiddleware
         {
             ValidationException ex => HandleValidationExceptionAsync(httpContext, ex),
             NotFoundException ex => HandleNotFoundExceptionAsync(httpContext, ex),
+            NoAvailableSeatsException ex => HandleNoAvailableSeatsExceptionAsync(httpContext, ex),
             _ => HandleInternalServerErrorAsync(httpContext)
         });
     }
@@ -125,6 +127,31 @@ public class GlobalExceptionHandlingMiddleware
         {
             Title = "Ресурс не найден",
             Status = 404,
+            Detail = ex.Message,
+            Instance = context.Request.Path
+        };
+
+        await WriteProblemDetailsAsync(context, details);
+    }
+
+    /// <summary>
+    /// Обрабатывает <see cref="NoAvailableSeatsException"/>, возвращая 409 Conflict.
+    /// </summary>
+    /// <param name="context">Контекст HTTP-запроса.</param>
+    /// <param name="ex">Исключение с сообщением об отсутствии доступных мест.</param>
+    private async Task HandleNoAvailableSeatsExceptionAsync(HttpContext context, NoAvailableSeatsException ex)
+    {
+        _logger.LogWarning(
+            "Недостаточно доступных мест. Method={Method}, Path={Path}, Message={Message}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            ex.Message,
+            context.Request.Headers["x-request-id"].ToString());
+
+        var details = new ProblemDetails
+        {
+            Title = "Недостаточно доступных мест",
+            Status = 409,
             Detail = ex.Message,
             Instance = context.Request.Path
         };

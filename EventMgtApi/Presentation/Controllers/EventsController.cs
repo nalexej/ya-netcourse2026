@@ -194,6 +194,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BookingResponseDto>> CreateBookingForEvent
             (Guid id,
             [FromBody] CreateBookingRequestDto? request = null) // закладка на будущее
