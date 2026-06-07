@@ -30,7 +30,8 @@ public class EventServiceTests
                 Title = "Встреча с командой (план)",
                 Description = "Обсуждение плана",
                 StartAt = new DateTime(2026, 5, 14, 10, 0, 0, DateTimeKind.Utc),
-                EndAt = new DateTime(2026, 5, 15, 23, 0, 0, DateTimeKind.Utc)
+                EndAt = new DateTime(2026, 5, 15, 23, 0, 0, DateTimeKind.Utc),
+                TotalSeats = 10
             },
             "Обсуждение плана"
         };
@@ -42,7 +43,8 @@ public class EventServiceTests
                 Title = "План на квартал",
                 Description = null,
                 StartAt = new DateTime(2026, 5, 15, 9, 0, 0, DateTimeKind.Utc),
-                EndAt = new DateTime(2026, 5, 15, 10, 30, 0, DateTimeKind.Utc)
+                EndAt = new DateTime(2026, 5, 15, 10, 30, 0, DateTimeKind.Utc),
+                TotalSeats = 10
             },
             string.Empty
         };
@@ -53,7 +55,8 @@ public class EventServiceTests
             {
                 Title = "Встреча по обучению сотрудников",
                 StartAt = new DateTime(2026, 5, 16, 14, 0, 0, DateTimeKind.Utc),
-                EndAt = new DateTime(2026, 5, 16, 23, 0, 0, DateTimeKind.Utc)
+                EndAt = new DateTime(2026, 5, 16, 23, 0, 0, DateTimeKind.Utc),
+                TotalSeats = 10
             },
             string.Empty
         };
@@ -91,7 +94,8 @@ public class EventServiceTests
         {
             Title = string.Empty,
             StartAt = DateTime.UtcNow.AddDays(1),
-            EndAt = DateTime.UtcNow.AddDays(2)
+            EndAt = DateTime.UtcNow.AddDays(2),
+            TotalSeats = 10
         };
 
         // Act & Assert
@@ -115,7 +119,8 @@ public class EventServiceTests
         {
             Title = "Тест",
             StartAt = DateTime.UtcNow.AddDays(2),
-            EndAt = DateTime.UtcNow.AddDays(1)
+            EndAt = DateTime.UtcNow.AddDays(1),
+            TotalSeats = 10
         };
 
         // Act & Assert
@@ -216,7 +221,8 @@ public class EventServiceTests
             Title = "Обновлённое название",
             Description = "Новое описание",
             StartAt = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc),
-            EndAt = new DateTime(2026, 5, 14, 13, 0, 0, DateTimeKind.Utc)
+            EndAt = new DateTime(2026, 5, 14, 13, 0, 0, DateTimeKind.Utc),
+            TotalSeats = 10
         };
 
         // Act
@@ -253,7 +259,8 @@ public class EventServiceTests
         {
             Title = "Тест",
             StartAt = DateTime.UtcNow.AddDays(2),
-            EndAt = DateTime.UtcNow.AddDays(1)
+            EndAt = DateTime.UtcNow.AddDays(1),
+            TotalSeats = 10
         };
 
         // Act & Assert
@@ -265,7 +272,7 @@ public class EventServiceTests
     public async Task UpdateEvent_NonExistingId_ThrowsNotFoundException()
     {
         // Arrange
-        var updateDto = new EventDto { Title = "Тест", StartAt = DateTime.UtcNow, EndAt = DateTime.UtcNow.AddHours(1) };
+        var updateDto = new EventDto { Title = "Тест", StartAt = DateTime.UtcNow, EndAt = DateTime.UtcNow.AddHours(1), TotalSeats = 10 };
         var nonExistingId = Guid.NewGuid();
 
         // Act & Assert
@@ -624,7 +631,8 @@ public class EventServiceTests
             {
                 Title = $"Событие {i}",
                 StartAt = DateTime.UtcNow.AddDays(i),
-                EndAt = DateTime.UtcNow.AddDays(i + 1)
+                EndAt = DateTime.UtcNow.AddDays(i + 1),
+                TotalSeats = 10
             });
         }
 

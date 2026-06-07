@@ -1,7 +1,8 @@
-﻿using EventMgtApi.Domain.Entities;
+using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using EventMgtApi.Infrastructure.Repositories;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 using Xunit;
@@ -16,14 +17,7 @@ public class InMemoryBookingRepositoryTests
     public async Task AddAsync_And_GetByIdAsync_ReturnsSameBooking()
     {
         // Arrange
-        var booking = new Booking(eventId: Guid.NewGuid())
-        {
-            Id = Guid.NewGuid(),
-            Status = BookingStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            ProcessedAt = null
-        };
-
+        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), BookingStatus.Pending);
 
         // Act
         await _repo.AddAsync(booking);
@@ -37,13 +31,7 @@ public class InMemoryBookingRepositoryTests
     public async Task UpdateAsync_UpdatesExistingBooking()
     {
         // Arrange
-        var booking = new Booking(eventId: Guid.NewGuid())
-        {
-            Id = Guid.NewGuid(),
-            Status = BookingStatus.Pending,
-            CreatedAt = DateTime.UtcNow,
-            ProcessedAt = null
-        };
+        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), BookingStatus.Pending);
 
         await _repo.AddAsync(booking);
 
@@ -74,11 +62,8 @@ public class InMemoryBookingRepositoryTests
     public async Task GetByEventIdAsync_ReturnsBookingsForEvent()
     {
         // Arrange
-        var booking1 = new Booking(_eventId); 
-        var booking2 = new Booking(Guid.NewGuid());
-
-        booking1.Status = BookingStatus.Pending;
-        booking2.Status = BookingStatus.Pending;
+        var booking1 = TestDataFactory.CreateBooking(_eventId, BookingStatus.Pending);
+        var booking2 = TestDataFactory.CreateBooking(Guid.NewGuid(), BookingStatus.Pending);
 
         await _repo.AddAsync(booking1);
         await _repo.AddAsync(booking2);
@@ -89,5 +74,27 @@ public class InMemoryBookingRepositoryTests
         // Assert
         result.Should().HaveCount(1);
         result.Should().ContainSingle(b => b.Id == booking1.Id);
+    }
+
+    [Fact]
+    public async Task GetByStatusAsync_ReturnsBookingsWithSpecificStatus()
+    {
+        // Arrange
+        var booking1 = TestDataFactory.CreateBooking(_eventId, BookingStatus.Pending);
+        var booking2 = TestDataFactory.CreateBooking(_eventId, BookingStatus.Confirmed);
+        var booking3 = TestDataFactory.CreateBooking(Guid.NewGuid(), BookingStatus.Pending);
+
+        await _repo.AddAsync(booking1);
+        await _repo.AddAsync(booking2);
+        await _repo.AddAsync(booking3);
+
+        // Act
+        var result = await _repo.GetByStatusAsync(BookingStatus.Pending);
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Should().Contain(b => b.Id == booking1.Id);
+        result.Should().Contain(b => b.Id == booking3.Id);
+        result.Should().NotContain(b => b.Id == booking2.Id);
     }
 }

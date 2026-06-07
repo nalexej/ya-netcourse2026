@@ -1,56 +1,49 @@
 ﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using FluentAssertions;
-using System;
 using Xunit;
 
 namespace EventMgtApi.Tests;
 
 public class BookingTests
 {
-    private readonly Guid _eventId = Guid.NewGuid();
-
-    [Fact]
-    public void Constructor_WithEventId_SetsDefaults()
-    {
-        // Act
-        var booking = new Booking(_eventId);
-
-        // Assert
-        booking.EventId.Should().Be(_eventId);
-        booking.Status.Should().Be(BookingStatus.Pending);
-        booking.Id.Should().NotBeEmpty();
-        booking.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-        booking.ProcessedAt.Should().BeNull();
-    }
-
-    [Fact]
-    public void ManualConfirm_SetsStatusToConfirmedAndProcessedAt()
+    [Theory]
+    [InlineData(BookingStatus.Pending)]
+    [InlineData(BookingStatus.Confirmed)]
+    [InlineData(BookingStatus.Rejected)]
+    public void Confirm_SetsStatusToConfirmed(BookingStatus initialState)
     {
         // Arrange
-        var booking = new Booking(_eventId);
+        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), initialState);
 
         // Act
-        booking.Status = BookingStatus.Confirmed;
-        booking.ProcessedAt = DateTime.UtcNow;
+        booking.Confirm();
 
         // Assert
-        booking.Status.Should().Be(BookingStatus.Confirmed);
-        booking.ProcessedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        booking.Status.Should().Be(BookingStatus.Confirmed,
+            $"Confirm() должен установить статус Confirmed для начального состояния {initialState}");
+
+        booking.ProcessedAt.Should().NotBeNull("ProcessedAt должен быть установлен");
+        booking.ProcessedAt!.Value.Kind.Should().Be(DateTimeKind.Utc, "ProcessedAt должен быть в UTC");
     }
 
-    [Fact]
-    public void ManualReject_SetsStatusToRejectedAndProcessedAt()
+    [Theory]
+    [InlineData(BookingStatus.Pending)]
+    [InlineData(BookingStatus.Confirmed)]
+    [InlineData(BookingStatus.Rejected)]
+    public void Reject_SetsStatusToRejected(BookingStatus initialState)
     {
         // Arrange
-        var booking = new Booking(_eventId);
+        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), initialState);
 
         // Act
-        booking.Status = BookingStatus.Rejected;
-        booking.ProcessedAt = DateTime.UtcNow;
+        booking.Reject();
 
         // Assert
-        booking.Status.Should().Be(BookingStatus.Rejected);
-        booking.ProcessedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        booking.Status.Should().Be(BookingStatus.Rejected,
+            $"Reject() должен установить статус Rejected для начального состояния {initialState}");
+
+        booking.ProcessedAt.Should().NotBeNull("ProcessedAt должен быть установлен");
+        booking.ProcessedAt!.Value.Kind.Should().Be(DateTimeKind.Utc, "ProcessedAt должен быть в UTC");
     }
 }
