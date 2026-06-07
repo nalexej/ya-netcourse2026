@@ -17,11 +17,25 @@ namespace EventMgtApi.Domain.Interfaces
         Task<List<Event>> GetAllAsync();
 
         /// <summary>
+        /// Синхронно возвращает событие по идентификатору.
+        /// </summary>
+        /// <param name="id">Идентификатор события.</param>
+        /// <returns>Событие, если найдено; иначе <see langword="null"/>.</returns>
+        Event? GetById(Guid id);
+
+        /// <summary>
         /// Асинхронно возвращает событие по идентификатору.
         /// </summary>
         /// <param name="id">Идентификатор события.</param>
         /// <returns>Событие, если найдено; иначе <see langword="null"/>.</returns>
         Task<Event?> GetByIdAsync(Guid id);
+
+
+        /// <summary>
+        /// Синхронно добавляет новое событие.
+        /// </summary>
+        /// <param name="event">Событие для добавления. Не должно быть null.</param>
+        void Add(Event @event);
 
         /// <summary>
         /// Асинхронно добавляет новое событие.
@@ -29,6 +43,13 @@ namespace EventMgtApi.Domain.Interfaces
         /// <param name="event">Событие для добавления. Не должно быть null.</param>
         /// <returns>Задача, представляющая асинхронную операцию.</returns>
         Task AddAsync(Event @event);
+
+        /// <summary>
+        /// Синхронно обновляет существующее событие.
+        /// </summary>
+        /// <param name="event">Событие с обновлёнными данными. Должно иметь существующий Id.</param>
+        /// <returns><see langword="true"/>, если обновление прошло успешно; иначе <see langword="false"/>.</returns>
+        bool Update(Event @event);
 
         /// <summary>
         /// Асинхронно обновляет существующее событие.

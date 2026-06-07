@@ -39,6 +39,13 @@ public interface IBookingRepository
     Task<IEnumerable<Booking>> GetByStatusAsync(BookingStatus status);
 
     /// <summary>
+    /// Синхронно добавляет новую бронь.
+    /// </summary>
+    /// <param name="booking">Бронь для добавления. Должна иметь валидный <see cref="Booking.Id"/>.</param>
+    /// <returns>Добавленная бронь.</returns>
+    Booking Add(Booking booking);
+
+    /// <summary>
     /// Асинхронно добавляет новую бронь.
     /// </summary>
     /// <param name="booking">Бронь для добавления. Должна иметь валидный <see cref="Booking.Id"/>.</param>

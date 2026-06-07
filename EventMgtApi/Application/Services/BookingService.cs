@@ -33,28 +33,29 @@ public class BookingService : IBookingService
     /// <inheritdoc />
     public async Task<BookingResponseDto> CreateBookingAsync(Guid eventId)
     {
+        Event? @event;
         if (eventId == Guid.Empty)
             throw new ArgumentException("Идентификатор события не может быть пустым.", nameof(eventId));
 
-        // Получаем событие из репозитория
-        var @event = await _eventRepository.GetByIdAsync(eventId);
-        if (@event is null)
-            throw new NotFoundException($"Событие с ID {eventId} не найдено.");
-
         lock (_bookingLock)
         {
+            // Получаем событие из репозитория
+            @event =  _eventRepository.GetById(eventId);
+            if (@event is null)
+                throw new NotFoundException($"Событие с ID {eventId} не найдено.");
+
             // Пытаемся зарезервировать место
             if (!@event.TryReserveSeats())
                 throw new NoAvailableSeatsException("Нет доступных мест для данного события.");
 
             // Обновляем событие в репозитории
-            _eventRepository.UpdateAsync(@event).Wait(); // добавляем Wait - так поставлена задача
+            _eventRepository.Update(@event);
 
             // Создаём бронь
             var booking = new Booking(eventId);
 
             // Сохраняем бронь
-            _bookingRepository.AddAsync(booking).Wait(); 
+            _bookingRepository.Add(booking); 
 
             return booking.ToDtoResponse();
         }

@@ -24,9 +24,24 @@ namespace EventMgtApi.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
+        public Event? GetById(Guid id)
+        {
+            return _events.TryGetValue(id, out var @event) ? @event : null;
+        }
+
+        /// <inheritdoc />
         public Task<Event?> GetByIdAsync(Guid id)
         {
             return Task.FromResult(_events.TryGetValue(id, out var @event) ? @event : null);
+        }
+
+        /// <inheritdoc />
+        public void Add(Event @event)
+        {
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
+
+            _events[@event.Id] = @event;
         }
 
         /// <inheritdoc />
@@ -37,6 +52,17 @@ namespace EventMgtApi.Infrastructure.Repositories
 
             _events[@event.Id] = @event;
             return Task.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public bool Update(Event @event)
+        {
+            if (@event == null)
+                throw new ArgumentNullException(nameof(@event));
+
+            return _events.ContainsKey(@event.Id) && _events.TryUpdate(@event.Id, @event, _events[@event.Id])
+                ? true
+                : false;
         }
 
         /// <inheritdoc />

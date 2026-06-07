@@ -35,9 +35,9 @@ public class BookingServiceTests
         // Arrange
         var @event = TestDataFactory.CreateTestEvent(totalSeats: 10);
 
-        _eventRepoMock.Setup(r => r.GetByIdAsync(@event.Id)).ReturnsAsync(@event);
-        _bookingRepoMock.Setup(r => r.AddAsync(It.IsAny<Booking>()))
-            .Returns((Booking b) => Task.FromResult(b));
+        _eventRepoMock.Setup(r => r.GetById(@event.Id)).Returns(@event);
+        _bookingRepoMock.Setup(r => r.Add(It.IsAny<Booking>()))
+            .Returns((Booking b) => b);
 
         // Act
         var result = await _service.CreateBookingAsync(@event.Id);
@@ -56,9 +56,9 @@ public class BookingServiceTests
         // Arrange
         var @event = TestDataFactory.CreateTestEvent(totalSeats: 10);
 
-        _eventRepoMock.Setup(r => r.GetByIdAsync(@event.Id)).ReturnsAsync(@event);
-        _bookingRepoMock.Setup(r => r.AddAsync(It.IsAny<Booking>()))
-            .Returns((Booking b) => Task.FromResult(b));
+        _eventRepoMock.Setup(r => r.GetById(@event.Id)).Returns(@event);
+        _bookingRepoMock.Setup(r => r.Add(It.IsAny<Booking>()))
+            .Returns((Booking b) => b);
 
         // Act
         var b1 = await _service.CreateBookingAsync(@event.Id);
