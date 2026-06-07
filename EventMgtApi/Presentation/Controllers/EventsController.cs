@@ -67,19 +67,9 @@ public class EventsController : ControllerBase
         if (id == Guid.Empty)
             return BadRequest("Идентификатор события не может быть пустым.");
 
-        try
-        {
-            var evt = await _eventService.GetEventAsync(id);
-            return Ok(evt);
-        }
-        catch (NotFoundException)
-        {
-            return NotFound();
-        }
-        catch (ArgumentNullException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var evt = await _eventService.GetEventAsync(id);
+
+        return Ok(evt);
     }
 
     /// <summary>
@@ -98,24 +88,12 @@ public class EventsController : ControllerBase
         if (evtDto == null)
             return BadRequest("Тело запроса не может быть null.");
 
-        try
-        {
-            var addedEvent = await _eventService.AddEventAsync(evtDto);
+        var addedEvent = await _eventService.AddEventAsync(evtDto);
 
-            return CreatedAtAction(
+        return CreatedAtAction(
                 nameof(GetEvent),
                 new { id = addedEvent.Id },
-                addedEvent
-            );
-        }
-        catch (ValidationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (ArgumentNullException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+                addedEvent);
     }
 
     /// <summary>
@@ -140,19 +118,10 @@ public class EventsController : ControllerBase
 
         if (evtDto == null)
             return BadRequest("Тело запроса не может быть null.");
-        try
-        {
-            var updatedEvent = await _eventService.UpdateEventAsync(id, evtDto);
-            return Ok(updatedEvent);
-        }
-        catch (ValidationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (NotFoundException)
-        {
-            return NotFound();
-        }
+
+        var updatedEvent = await _eventService.UpdateEventAsync(id, evtDto);
+
+        return Ok(updatedEvent);
     }
 
     /// <summary>
@@ -170,15 +139,8 @@ public class EventsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RemoveEvent(Guid id)
     {
-        try
-        {
-            await _eventService.RemoveEventAsync(id);
-            return NoContent();
-        }
-        catch (NotFoundException)
-        {
-            return NotFound();
-        }
+        await _eventService.RemoveEventAsync(id);
+        return NoContent();
     }
 
     /// <summary>
@@ -194,6 +156,7 @@ public class EventsController : ControllerBase
     [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BookingResponseDto>> CreateBookingForEvent
             (Guid id,
             [FromBody] CreateBookingRequestDto? request = null) // закладка на будущее
@@ -201,26 +164,11 @@ public class EventsController : ControllerBase
         if (id == Guid.Empty)
             return BadRequest("Идентификатор события не может быть пустым.");
 
-        try
-        {
-            var booking = await _bookingService.CreateBookingAsync(id);
+        var booking = await _bookingService.CreateBookingAsync(id);
 
-            var locationUri = Url.Action("GetBookingById", "Bookings", new { id = booking.Id }, Request.Scheme);
-            Response.Headers.Location = locationUri;
+        var locationUri = Url.Action("GetBookingById", "Bookings", new { id = booking.Id }, Request.Scheme);
+        Response.Headers.Location = locationUri;
 
-            return Accepted(booking);
-        }
-        catch (NotFoundException)
-        {
-            return NotFound();
-        }
-        catch (ValidationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (ArgumentNullException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        return Accepted(booking);
     }
 }

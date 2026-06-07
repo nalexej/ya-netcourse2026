@@ -29,4 +29,14 @@ public class EventDtoResponse
     /// Дата и время окончания события.
     /// </summary>
     public required DateTime? EndAt { get; set; }
+
+    /// <summary>
+    /// Общее количество мест на событии.
+    /// </summary>
+    public required int TotalSeats { get; set; }
+
+    /// <summary>
+    /// Текущее количество свободных мест.
+    /// </summary>
+    public required int AvailableSeats { get; set; }
 }

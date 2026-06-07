@@ -49,6 +49,19 @@ public class InMemoryBookingRepository : IBookingRepository
     }
 
     /// <inheritdoc />
+    public Booking Add(Booking booking)
+    {
+        if (booking == null)
+            throw new ArgumentNullException(nameof(booking));
+
+        if (booking.Id == Guid.Empty)
+            throw new ArgumentException("Бронь должна иметь валидный Id.", nameof(booking));
+
+        _bookings[booking.Id] = booking;
+        return booking;
+    }
+
+    /// <inheritdoc />
     public Task<Booking> AddAsync(Booking booking)
     {
         if (booking == null)

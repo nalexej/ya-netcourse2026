@@ -41,4 +41,22 @@ public class Booking
     {
         EventId = eventId;
     }
+
+    /// <summary>
+    /// Подтверждает бронь, переводя её в статус Confirmed и устанавливая ProcessedAt.
+    /// </summary>
+    public void Confirm()
+    {
+        Status = BookingStatus.Confirmed;
+        ProcessedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Отклоняет бронь, переводя её в статус Rejected и устанавливая ProcessedAt.
+    /// </summary>
+    public void Reject()
+    {
+        Status = BookingStatus.Rejected;
+        ProcessedAt = DateTime.UtcNow;
+    }
 }
