@@ -99,6 +99,40 @@ namespace EventMgtApi.Domain.Entities
 
         #endregion
 
+        /// <summary>
+        /// Обновляеи сущесьвующее событие.
+        /// </summary>
+        /// <param name="title">Заголовок события.</param>
+        /// <param name="startAt">Дата и время начала.</param>
+        /// <param name="endAt">Дата и время окончания.</param>
+        /// <param name="totalSeats">Общее количество мест (должно быть больше 0).</param>
+        /// <param name="description">Описание события (опционально).</param>
+        /// <returns>Обновленная сущность Event.</returns>
+        /// <exception cref="ValidationException">Если totalSeats меньше либо равно 0.</exception>
+        public void Update(string? title, DateTime? startAt, DateTime? endAt, int totalSeats, string? description = null)
+        {
+            if (string.IsNullOrWhiteSpace(title))
+                throw new ValidationException("Заголовок обязателен.");
+
+            if (!startAt.HasValue)
+                throw new ValidationException("Дата начала обязательна.");
+
+            if (!endAt.HasValue)
+                throw new ValidationException("Дата окончания обязательна.");
+
+            if (startAt >= endAt)
+                throw new ValidationException("Дата начала должна быть раньше даты окончания.");
+
+            if (totalSeats <= 0)
+                throw new ValidationException("Общее количество мест должно быть больше нуля.");
+
+            Title = title!;
+            StartAt = startAt!.Value;
+            EndAt = endAt!.Value;
+            TotalSeats = totalSeats;
+            Description = description;
+        }
+
         #region Methods
 
         /// <summary>
