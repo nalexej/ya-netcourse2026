@@ -10,6 +10,9 @@ namespace EventMgtApi.Domain.Entities
     /// </summary>
     public class Event
     {
+
+        #region Properties
+
         /// <summary>
         /// Уникальный идентификатор события.
         /// </summary>
@@ -46,6 +49,22 @@ namespace EventMgtApi.Domain.Entities
         public int AvailableSeats { get; set; }
 
         /// <summary>
+        /// Навигационное свойство: список бронирований.
+        /// </summary>
+        public ICollection<Booking> Bookings { get; private set; } = [];
+ 
+        #endregion
+
+        #region Constructors
+
+        // Приватный конструктор без параметров для ORM
+        private Event() { }
+
+        #endregion
+
+        #region Factory Methods
+
+        /// <summary>
         /// Создаёт новое событие с валидацией TotalSeats.
         /// </summary>
         /// <param name="title">Заголовок события.</param>
@@ -78,6 +97,10 @@ namespace EventMgtApi.Domain.Entities
             };
         }
 
+        #endregion
+
+        #region Methods
+
         /// <summary>
         /// Пытается зарезервировать указанное количество мест.
         /// Возвращает false, если свободных мест недостаточно;
@@ -107,5 +130,8 @@ namespace EventMgtApi.Domain.Entities
 
             AvailableSeats = Math.Min(AvailableSeats + count, TotalSeats);
         }
+
+        #endregion
+
     }
 }

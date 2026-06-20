@@ -8,6 +8,9 @@ namespace EventMgtApi.Domain.Entities;
 /// </summary>
 public class Booking
 {
+
+    #region Properties
+
     /// <summary>
     /// Уникальный идентификатор брони.
     /// </summary>
@@ -34,6 +37,18 @@ public class Booking
     public DateTime? ProcessedAt { get; set; }
 
     /// <summary>
+    /// Навигационное свойство: ссылка на связанное событие 
+    /// </summary>
+    public Event? Event { get; private set; } = null!;
+
+    #endregion
+
+    #region Constructors
+
+    // Приватный конструктор без параметров для ORM 
+    private Booking() { }
+
+    /// <summary>
     /// Создаёт новую бронь с начальными значениями: Pending, Id, CreatedAt.
     /// </summary>
     /// <param name="eventId">Идентификатор события, для которого создаётся бронь.</param>
@@ -41,6 +56,10 @@ public class Booking
     {
         EventId = eventId;
     }
+
+    #endregion
+
+    #region Methods
 
     /// <summary>
     /// Подтверждает бронь, переводя её в статус Confirmed и устанавливая ProcessedAt.
@@ -59,4 +78,7 @@ public class Booking
         Status = BookingStatus.Rejected;
         ProcessedAt = DateTime.UtcNow;
     }
+
+    #endregion
+
 }
