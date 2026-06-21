@@ -1,23 +1,36 @@
-﻿using System;
-using System.Linq;
-using Xunit;
-using FluentAssertions;
-using EventMgtApi.Domain.Exceptions;
+﻿using EventMgtApi.Application.DTOs;
 using EventMgtApi.Application.Services;
-using EventMgtApi.Application.DTOs;
-using EventMgtApi.Infrastructure.Repositories;
+using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Infrastructure.DataAccess;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventMgtApi.Tests;
 
-public class EventServiceTests
+public sealed class EventServiceTests : IDisposable
 {
-    private readonly EventService _service;
-    private readonly InMemoryEventRepository _repository;
+    private readonly ServiceProvider _serviceProvider;
+    private readonly IServiceScope _scope;
+    private readonly IEventService _eventService;
 
     public EventServiceTests()
     {
-        _repository = new InMemoryEventRepository();
-        _service = new EventService(_repository);
+        var dbName = Guid.NewGuid().ToString();
+        var services = new ServiceCollection();
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseInMemoryDatabase(dbName));
+        services.AddScoped<IEventService, EventService>();
+
+        _serviceProvider = services.BuildServiceProvider();
+        _scope = _serviceProvider.CreateScope();
+        _eventService = _scope.ServiceProvider.GetRequiredService<IEventService>();
+    }
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+        _serviceProvider.Dispose();
     }
 
     // Тестовые данные: валидные DTO для создания/обновления событий
@@ -29,8 +42,8 @@ public class EventServiceTests
             {
                 Title = "Встреча с командой (план)",
                 Description = "Обсуждение плана",
-                StartAt = new DateTime(2026, 5, 14, 10, 0, 0, DateTimeKind.Utc),
-                EndAt = new DateTime(2026, 5, 15, 23, 0, 0, DateTimeKind.Utc),
+                StartAt = DateTime.UtcNow.AddDays(1),
+                EndAt = DateTime.UtcNow.AddDays(2),
                 TotalSeats = 10
             },
             "Обсуждение плана"
@@ -42,8 +55,8 @@ public class EventServiceTests
             {
                 Title = "План на квартал",
                 Description = null,
-                StartAt = new DateTime(2026, 5, 15, 9, 0, 0, DateTimeKind.Utc),
-                EndAt = new DateTime(2026, 5, 15, 10, 30, 0, DateTimeKind.Utc),
+                StartAt = DateTime.UtcNow.AddDays(3),
+                EndAt = DateTime.UtcNow.AddDays(4),
                 TotalSeats = 10
             },
             string.Empty
@@ -54,8 +67,8 @@ public class EventServiceTests
             new EventDto
             {
                 Title = "Встреча по обучению сотрудников",
-                StartAt = new DateTime(2026, 5, 16, 14, 0, 0, DateTimeKind.Utc),
-                EndAt = new DateTime(2026, 5, 16, 23, 0, 0, DateTimeKind.Utc),
+                StartAt = DateTime.UtcNow.AddDays(5),
+                EndAt = DateTime.UtcNow.AddDays(6),
                 TotalSeats = 10
             },
             string.Empty
@@ -72,7 +85,7 @@ public class EventServiceTests
     public async Task CreateEvent_ValidEvent_ReturnsCreatedEventWithId(EventDto inputEvent, string expectedDescription)
     {
         // Act
-        var result = await _service.AddEventAsync(inputEvent);
+        var result = await _eventService.AddEventAsync(inputEvent);
 
         // Assert
         result.Should().NotBeNull("потому что сервис должен возвращать результат");
@@ -99,12 +112,13 @@ public class EventServiceTests
         };
 
         // Act & Assert
-        var exception = await _service
-            .Invoking(s => s.AddEventAsync(dto))
-            .Should().ThrowAsync<ValidationException>();
+        var exception = await _eventService
+             .Invoking(s => s.AddEventAsync(dto))
+             .Should().ThrowAsync<ValidationException>();
 
-        // Дополнительная проверка сообщения
-        exception.Which.Message.Should().Contain("Заголовок обязателен.");
+        exception.Which.Message.Should().Be("Ошибка валидации");
+        exception.Which.Errors.ContainsKey("Title").Should().BeTrue();
+        exception.Which.Errors["Title"].Should().Contain("Заголовок обязателен.");
     }
 
     /// <summary>
@@ -124,10 +138,13 @@ public class EventServiceTests
         };
 
         // Act & Assert
-        await _service
+        var exception = await _eventService
             .Invoking(s => s.AddEventAsync(dto))
-            .Should().ThrowAsync<ValidationException>()
-            .WithMessage("Дата начала должна быть раньше даты окончания.");
+            .Should().ThrowAsync<ValidationException>();
+
+        exception.Which.Message.Should().Be("Ошибка валидации");
+        exception.Which.Errors.ContainsKey("StartAt").Should().BeTrue();
+        exception.Which.Errors["StartAt"].Should().Contain("Дата начала должна быть раньше даты окончания.");
     }
 
     // ========================================================================
@@ -143,11 +160,11 @@ public class EventServiceTests
 
         foreach (var evt in eventsToAdd)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         // Act
-        var result = await _service.GetEventsAsync();
+        var result = await _eventService.GetEventsAsync();
 
         // Assert
         Assert.Equal(3, result.TotalCount);
@@ -172,11 +189,11 @@ public class EventServiceTests
         var testEventDto = ValidEventDtos().First();
         var inputEvent = (EventDto)testEventDto[0];
 
-        var addedEvent = await _service.AddEventAsync(inputEvent);
+        var addedEvent = await _eventService.AddEventAsync(inputEvent);
         var id = addedEvent.Id;
 
         // Act
-        var result = await _service.GetEventAsync(id);
+        var result = await _eventService.GetEventAsync(id);
 
         // Assert
         Assert.NotNull(result);
@@ -196,7 +213,7 @@ public class EventServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<NotFoundException>
-                (async () => await _service.GetEventAsync(nonExistingId));
+                (async () => await _eventService.GetEventAsync(nonExistingId));
 
 
     Assert.Contains($"Событие с ID {nonExistingId} не найдено", exception.Message);
@@ -212,7 +229,7 @@ public class EventServiceTests
     {
         // Arrange
         // Берём первое событие из ValidEventDtos для создания
-        var addedEvent = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
+        var addedEvent = await _eventService.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var id = addedEvent.Id;
 
         // Событие для обновления (новые данные)
@@ -220,13 +237,13 @@ public class EventServiceTests
         {
             Title = "Обновлённое название",
             Description = "Новое описание",
-            StartAt = new DateTime(2026, 5, 14, 12, 0, 0, DateTimeKind.Utc),
-            EndAt = new DateTime(2026, 5, 14, 13, 0, 0, DateTimeKind.Utc),
+            StartAt = DateTime.UtcNow.AddDays(1),
+            EndAt = DateTime.UtcNow.AddDays(2),
             TotalSeats = 10
         };
 
         // Act
-        var result = await _service.UpdateEventAsync(id, updateDto);
+        var result = await _eventService.UpdateEventAsync(id, updateDto);
 
         // Assert
         Assert.NotNull(result);
@@ -242,11 +259,11 @@ public class EventServiceTests
     public async Task UpdateEvent_EmptyTitle_ThrowsValidationException()
     {
         // Arrange
-        var added = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
+        var added = await _eventService.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var updateDto = new EventDto { Title = string.Empty };
 
         // Act & Assert
-        await Assert.ThrowsAsync<ValidationException>(async () => await _service.UpdateEventAsync(added.Id, updateDto));
+        await Assert.ThrowsAsync<ValidationException>(async () => await _eventService.UpdateEventAsync(added.Id, updateDto));
     }
 
     // Проверяет валидацию: StartAfterEnd при обновлении → ошибка
@@ -254,7 +271,7 @@ public class EventServiceTests
     public async Task UpdateEvent_StartAfterEnd_ThrowsValidationException()
     {
         // Arrange
-        var added = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
+        var added = await _eventService.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var updateDto = new EventDto
         {
             Title = "Тест",
@@ -264,7 +281,7 @@ public class EventServiceTests
         };
 
         // Act & Assert
-        await Assert.ThrowsAsync<ValidationException>(async () => await _service.UpdateEventAsync(added.Id, updateDto));
+        await Assert.ThrowsAsync<ValidationException>(async () => await _eventService.UpdateEventAsync(added.Id, updateDto));
     }
 
     // Проверяет: обновление несуществующего ID → ошибка
@@ -276,7 +293,7 @@ public class EventServiceTests
         var nonExistingId = Guid.NewGuid();
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<NotFoundException>(async () => await _service.UpdateEventAsync(nonExistingId, updateDto));
+        var ex = await Assert.ThrowsAsync<NotFoundException>(async () => await _eventService.UpdateEventAsync(nonExistingId, updateDto));
         Assert.Contains("не найдено", ex.Message);
     }
 
@@ -290,14 +307,14 @@ public class EventServiceTests
     {
         // Arrange
         // Добавляем событие, чтобы получить реальный ID
-        var addedEvent = await _service.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
+        var addedEvent = await _eventService.AddEventAsync((EventDto)ValidEventDtos().First()[0]!);
         var id = addedEvent.Id;
 
         // Act
-        await _service.RemoveEventAsync(id);
+        await _eventService.RemoveEventAsync(id);
 
         // Assert
-        var exception = await Assert.ThrowsAsync<NotFoundException>(async () => await _service.GetEventAsync(id));
+        var exception = await Assert.ThrowsAsync<NotFoundException>(async () => await _eventService.GetEventAsync(id));
         Assert.Contains($"Событие с ID {id} не найдено", exception.Message);
     }
 
@@ -310,7 +327,7 @@ public class EventServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<NotFoundException>
-                (async () => await _service.RemoveEventAsync(nonExistingId)
+                (async () => await _eventService.RemoveEventAsync(nonExistingId)
         );
 
         Assert.Contains("не найдено", exception.Message);
@@ -329,13 +346,13 @@ public class EventServiceTests
 
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count(e => e.Title?.Contains("план", StringComparison.OrdinalIgnoreCase) == true);
 
         // Act
-        var result = await _service.GetEventsAsync(title: "план");
+        var result = await _eventService.GetEventsAsync(title: "план");
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -352,13 +369,13 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count;
 
         // Act
-        var result = await _service.GetEventsAsync(title: null);
+        var result = await _eventService.GetEventsAsync(title: null);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -373,13 +390,13 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count;
 
         // Act
-        var result = await _service.GetEventsAsync(title: string.Empty);
+        var result = await _eventService.GetEventsAsync(title: string.Empty);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -394,13 +411,13 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         var expectedCount = testEvents.Count;
 
         // Act
-        var result = await _service.GetEventsAsync(title: "   ");
+        var result = await _eventService.GetEventsAsync(title: "   ");
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -415,11 +432,11 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         // Act
-        var result = await _service.GetEventsAsync(title: "несуществующее");
+        var result = await _eventService.GetEventsAsync(title: "несуществующее");
 
         // Assert
         Assert.Equal(0, result.TotalCount);
@@ -438,15 +455,15 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
-        var from = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        var from = DateTime.UtcNow.AddDays(1);
 
         var expectedCount = testEvents.Count(e => e.StartAt >= from);
 
         // Act
-        var result = await _service.GetEventsAsync(from: from);
+        var result = await _eventService.GetEventsAsync(from: from);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -462,7 +479,7 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         var to = new DateTime(2026, 5, 15, 23, 59, 59, DateTimeKind.Utc);
@@ -470,7 +487,7 @@ public class EventServiceTests
         var expectedCount = testEvents.Count(e => e.EndAt <= to);
 
         // Act
-        var result = await _service.GetEventsAsync(to: to);
+        var result = await _eventService.GetEventsAsync(to: to);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -486,16 +503,16 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
-        var from = new DateTime(2026, 5, 15, 0, 0, 0, DateTimeKind.Utc);
-        var to = new DateTime(2026, 5, 15, 23, 59, 59, DateTimeKind.Utc);
+        var from = DateTime.UtcNow.AddDays(1);
+        var to = DateTime.UtcNow.AddDays(2);
 
         var expectedCount = testEvents.Count(e => e.StartAt >= from && e.EndAt <= to);
 
         // Act
-        var result = await _service.GetEventsAsync(from: from, to: to);
+        var result = await _eventService.GetEventsAsync(from: from, to: to);
 
         // Assert
         Assert.Equal(expectedCount, result.TotalCount);
@@ -515,13 +532,13 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         var from = DateTime.UtcNow.AddYears(10); // далеко в будущем
 
         // Act
-        var result = await _service.GetEventsAsync(from: from);
+        var result = await _eventService.GetEventsAsync(from: from);
 
         // Assert
         Assert.Equal(0, result.TotalCount);
@@ -542,7 +559,7 @@ public class EventServiceTests
         // Убедимся, что все события добавлены
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         // Ожидаем: pageSize = 2 → страница 1: 2 события, страница 2: 1 событие
@@ -550,7 +567,7 @@ public class EventServiceTests
         const int pageSize = 2;
 
         // Act
-        var result = await _service.GetEventsAsync(page: page, pageSize: pageSize);
+        var result = await _eventService.GetEventsAsync(page: page, pageSize: pageSize);
 
         // Assert
         Assert.Equal(3, result.TotalCount);       // Всего 3 события
@@ -567,11 +584,11 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         // Act
-        var result = await _service.GetEventsAsync(page: 1, pageSize: 2);
+        var result = await _eventService.GetEventsAsync(page: 1, pageSize: 2);
 
         // Assert
         Assert.Equal(3, result.TotalCount);
@@ -588,11 +605,11 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         // Act
-        var result = await _service.GetEventsAsync(page: 0, pageSize: 2);
+        var result = await _eventService.GetEventsAsync(page: 0, pageSize: 2);
 
         // Assert
         Assert.Equal(1, result.Page);
@@ -609,11 +626,11 @@ public class EventServiceTests
         var testEvents = ValidEventDtos().Select(evt => (EventDto)evt[0]!).ToList();
         foreach (var evt in testEvents)
         {
-            await _service.AddEventAsync(evt);
+            await _eventService.AddEventAsync(evt);
         }
 
         // Act
-        var result = await _service.GetEventsAsync(page: 1, pageSize: 0);
+        var result = await _eventService.GetEventsAsync(page: 1, pageSize: 0);
 
         // Assert
         Assert.Equal(1, result.PageSize);
@@ -627,17 +644,17 @@ public class EventServiceTests
         // Arrange
         for (int i = 0; i < 50; i++)
         {
-            await _service.AddEventAsync(new EventDto
+            await _eventService.AddEventAsync(new EventDto
             {
                 Title = $"Событие {i}",
-                StartAt = DateTime.UtcNow.AddDays(i),
-                EndAt = DateTime.UtcNow.AddDays(i + 1),
+                StartAt = DateTime.UtcNow.AddDays(i + 1),
+                EndAt = DateTime.UtcNow.AddDays(i + 2),
                 TotalSeats = 10
             });
         }
 
         // Act
-        var result = await _service.GetEventsAsync(page: 1, pageSize: 150);
+        var result = await _eventService.GetEventsAsync(page: 1, pageSize: 150);
 
         // Assert
         Assert.Equal(100, result.PageSize);
@@ -657,15 +674,15 @@ public class EventServiceTests
 
         foreach (var testEvent in testEvents)
         {
-            await _service.AddEventAsync(testEvent);
+            await _eventService.AddEventAsync(testEvent);
         }
 
-        var from = new DateTime(2026, 5, 14, 9, 0, 0, DateTimeKind.Utc);
-        var to = new DateTime(2026, 5, 15, 23, 59, 59, DateTimeKind.Utc);
+        var from = DateTime.UtcNow.AddHours(23);
+        var to = DateTime.UtcNow.AddDays(2);
         var title = "встреча";
 
         // Act
-        var result = await _service.GetEventsAsync(title: title, from: from, to: to);
+        var result = await _eventService.GetEventsAsync(title: title, from: from, to: to);
 
         // Assert
         Assert.Single(result.Items);

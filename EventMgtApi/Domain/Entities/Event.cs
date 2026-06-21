@@ -151,19 +151,19 @@ namespace EventMgtApi.Domain.Entities
                 AddError(errors, nameof(Title), "Заголовок обязателен.");
 
             if (!startAt.HasValue)
-                AddError(errors, nameof(Title), "Дата начала обязательна.");
+                AddError(errors, nameof(StartAt), "Дата начала обязательна.");
 
             if (!endAt.HasValue)
-                AddError(errors, nameof(Title), "Дата окончания обязательна.");
+                AddError(errors, nameof(EndAt), "Дата окончания обязательна.");
 
             if (startAt < DateTime.UtcNow)
                 AddError(errors, nameof(StartAt), "Дата начала не должна быть в прошлом.");
 
             if (startAt >= endAt)
-                AddError(errors, nameof(Title), "Дата начала должна быть раньше даты окончания.");
+                AddError(errors, nameof(StartAt), "Дата начала должна быть раньше даты окончания.");
 
             if (!totalSeats.HasValue || totalSeats.Value <= 0)
-                AddError(errors, nameof(Title), "Общее количество мест должно быть больше нуля.");
+                AddError(errors, nameof(TotalSeats), "Общее количество мест должно быть больше нуля.");
 
             if (errors.Any())
                 throw new ValidationException(errors);
