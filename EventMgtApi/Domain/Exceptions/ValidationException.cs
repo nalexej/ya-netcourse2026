@@ -16,6 +16,20 @@ namespace EventMgtApi.Domain.Exceptions
         public ModelStateDictionary ModelState { get; } = null!;
 
         /// <summary>
+        /// Коллекция ошибок валидации (для валидации в обход ModelState)
+        /// </summary>
+        public IDictionary<string, ICollection<string>> Errors { get; } = new Dictionary<string, ICollection<string>>();
+
+        /// <summary>
+        /// Инициализирует новый экземпляр класса <see cref="ValidationException"/> с заданной коллекцией ошибок.
+        /// </summary>
+        /// <param name="errors">Коллекция ошибок.</param>
+        public ValidationException(IDictionary<string, ICollection<string>> errors) : base("Ошибка валидации")
+        {
+            Errors = errors;
+        }
+
+        /// <summary>
         /// Инициализирует новый экземпляр класса <see cref="ValidationException"/> с заданным сообщением об ошибке.
         /// </summary>
         /// <param name="message">Сообщение, описывающее причину исключения.</param>

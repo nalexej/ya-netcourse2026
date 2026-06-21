@@ -114,7 +114,7 @@ public sealed class EventService : IEventService
         var eventEntity = await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken)
             ?? throw new NotFoundException($"Событие с ID {id} не найдено.");
 
-        eventEntity.Update(evtDto.Title, evtDto.StartAt, evtDto.EndAt, evtDto.TotalSeats, evtDto.Description);
+        eventEntity.Update(evtDto.Title, evtDto.StartAt, evtDto.EndAt, evtDto.Description);
         await _context.SaveChangesAsync(cancellationToken);
 
         return eventEntity.ToDtoResponse();

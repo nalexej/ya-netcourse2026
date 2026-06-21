@@ -52,11 +52,18 @@ namespace EventMgtApi.Application.DTOs;
         /// </returns>        
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            if (StartAt.HasValue && EndAt.HasValue && StartAt.Value >= EndAt.Value)
+        if (StartAt.HasValue && StartAt.Value < DateTime.UtcNow)
+        {
+            yield return new ValidationResult(
+                "Дата начала не должна быть в прошлом.",
+                new[] { nameof(StartAt) });
+        }
+
+        if (StartAt.HasValue && EndAt.HasValue && StartAt.Value >= EndAt.Value)
             {
                 yield return new ValidationResult(
                     "Дата начала должна быть раньше даты окончания.",
                     new[] { nameof(StartAt), nameof(EndAt) });
             }
-        }
+    }
     }
