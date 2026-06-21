@@ -44,6 +44,13 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+// Создания объектов БД
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
+
 // Настройка конвейера обработки запросов
 if (app.Environment.IsDevelopment())
 {
