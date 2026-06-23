@@ -67,11 +67,12 @@ API предоставляет полный цикл операций **CRUD**:
 
 - **.NET 10** / **C# 12**
 - **ASP.NET Core Web API**
-- **In-memory хранение** (данные теряются при перезапуске)
+- **PostgreSQL** (продакшен) / **In-Memory** (тесты)
+- **Entity Framework Core** (Npgsql провайдер)
 - **Dependency Injection (DI)**
 - **DTO для запросов/ответов** — изоляция модели
 - **Кастомная валидация** через `IValidatableObject`
-- **Потокобезопасность** с `lock` и `SemaphoreSlim`
+- **Потокобезопасность** с `SemaphoreSlim`
 - **Swagger UI** — документация API
 - **XML-документация** — для IntelliSense и Swagger
 - **Фоновые службы** — обработка броней
@@ -82,6 +83,41 @@ API предоставляет полный цикл операций **CRUD**:
 
 ### Предварительные требования
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- **PostgreSQL 14+** (локально или в Docker)
+> 💡 Для разработки и тестирования по умолчанию используется **In-Memory database** — данные хранятся только в памяти и теряются при перезапуске.  
+> Для полноценной работы (включая фоновые сервисы) рекомендуется использовать PostgreSQL.
+
+---
+
+### Настройка PostgreSQL
+
+Сервер PostgreSQL может быть запущен локально или в Docker.
+
+#### Создайте базу данных:
+
+```bash
+PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE eventapi;"
+```
+
+#### Добавьте строку подключения в appsettings.json:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username=postgres;Password=postgres"
+  }
+} 
+```
+
+Cхема базы данных создаётся автоматически при запуске (Program.cs):
+
+```csharp
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
+```csharp
 
 ### Сборка и запуск
 В корне репозитория выполните:
@@ -317,28 +353,12 @@ public enum BookingStatus
 
 ## 🔐 Примитивы синхронизации
 
-Для обеспечения потокобезопасности и предотвращения овербукинга используются два ключевых примитива:
+Для обеспечения потокобезопасности и предотвращения овербукинга используется **SemaphoreSlim**:
 
-### `lock` в `BookingService`
+### `SemaphoreSlim` в `BookingService`
 
 **Зачем нужен:**  
 При создании брони необходимо атомарно проверить наличие свободных мест и уменьшить счётчик `AvailableSeats`. Без синхронизации два одновременных запроса могут оба увидеть `AvailableSeats > 0`, создать брони, и в итоге продать больше мест, чем доступно.
-
-**Почему `lock`:**  
-- Простой и надёжный механизм блокировки на уровне одного процесса.
-- Гарантирует, что только один поток может выполнить критическую секцию кода одновременно.
-
----
-
-### `SemaphoreSlim` в `BookingProcessingBackgroundService`
-
-**Зачем нужен:**  
-При фоновой обработке броней (изменение статуса с `Pending` на `Confirmed`) необходимо ограничить количество одновременных операций, чтобы избежать перегрузки системы и обеспечить стабильную работу.
-
-**Почему `SemaphoreSlim`:**  
-- Асинхронная версия семафора, подходящая для `async/await`.
-- Позволяет контролировать максимальное количество одновременных операций.
-- Подходит для I/O-операций, таких как ожидание внешней системы.
 
 ---
 
@@ -388,7 +408,7 @@ POST /api/events/event-id/book
 
 ### Шаг 3: Обработка запросов
 
-Благодаря `lock` в `BookingService` запросы обрабатываются **последовательно**:
+Благодаря `SemaphoreSlim` в `BookingService` запросы обрабатываются **последовательно**:
 
 1. **Запрос 1** заходит в критическую секцию:
    - Проверяет: `AvailableSeats == 2` → OK
@@ -445,7 +465,7 @@ EventMgtApi/
 │   │   ├── IEventService.cs     # Интерфейс управления событиями
 │   │   ├── EventService.cs      # Реализация бизнес-логики событий
 │   │   ├── IBookingService.cs   # Интерфейс управления бронями
-│   │   └── BookingService.cs    # Логика создания и получения броней (с lock)
+│   │   └── BookingService.cs    # Логика создания и получения броней (с SemaphoreSlim)
 │   ├── DTOs/
 │   │   ├── EventDto.cs          # DTO для создания/обновления события
 │   │   ├── EventDtoResponse.cs  # DTO ответа с Id
@@ -457,8 +477,11 @@ EventMgtApi/
 │       └── EventMappingExtensions.cs # Методы ToDtoResponse(), ToDtoList()
 │
 ├── Infrastructure/               # Внешние реализации
-│   ├── Repositories/
-│   │   └── InMemoryEventRepository.cs # In-memory реализация репозитория
+│   ├── DataAccess/
+│   │   └── Configurations/ # Конфигурации объектов в базе данных
+│   │   	└── BookingConfiguration.cs # Бронирования
+│   │   	└── EventConfiguration.cs # События
+│   │   └── AppDbContext.cs # Контекст базы данных
 │   └── BackgroundServices/
 │       └── BookingProcessingBackgroundService.cs # Обработка Pending → Confirmed (с SemaphoreSlim)
 │
@@ -509,8 +532,7 @@ EventMgtApi/
 
 Реализованы unit-тесты для:
 - сервисов `EventService`, `BookingService`, `BookingProcessingBackgroundService`.
-- репозитория `InMemoryBookingRepository`
-- сущности `Booking`
+- сущностей `Event` и `Booking`
 
 Добавлены тесты на конкурентность.
 
@@ -524,7 +546,6 @@ dotnet test
 
 ### 🧱 Ограничения
 
-- Данные хранятся в памяти → теряются при перезапуске.
 - Нет аутентификации или авторизации.
 - Часовые пояса не обрабатываются.
 
@@ -532,8 +553,6 @@ dotnet test
 
 ### 🚧 Будущие улучшения
 
-- Перейти на EF Core + SQLite для постоянного хранения
-- Добавить маппинг (AutoMapper или ручной)
 - Сделать Docker-образ
 - Интеграция с email и платежами
 
