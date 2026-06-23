@@ -1,17 +1,57 @@
-﻿using EventMgtApi.Application.Services;
+﻿using EventMgtApi.Application.DTOs;
+using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Entities;
-using EventMgtApi.Domain.Enums;
-using EventMgtApi.Domain.Interfaces;
+using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Infrastructure.DataAccess;
 using FluentAssertions;
-using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Xunit;
 
 namespace EventMgtApi.Tests;
 
-public class ConcurrentTests
+public class ConcurrentTests: IDisposable
 {
-        [Fact]
+    private readonly ServiceProvider _serviceProvider;
+    private readonly IServiceScope _scope;
+    private readonly IEventService _eventService;
+    private readonly IBookingService _bookingService;
+
+    public ConcurrentTests()
+    {
+        var dbName = Guid.NewGuid().ToString();
+        var services = new ServiceCollection();
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseInMemoryDatabase(dbName));
+        services.AddScoped<IEventService, EventService>();
+        services.AddScoped<IBookingService, BookingService>();
+
+        _serviceProvider = services.BuildServiceProvider();
+        _scope = _serviceProvider.CreateScope();
+        _eventService = _scope.ServiceProvider.GetRequiredService<IEventService>();
+        _bookingService = _scope.ServiceProvider.GetRequiredService<IBookingService>();
+    }
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+        _serviceProvider.Dispose();
+    }
+
+    private async Task<Guid> CreateTestEventAsync(int totalSeats = 10)
+    {
+        var futureDate = DateTime.UtcNow.AddDays(1);
+        var created = await _eventService.AddEventAsync(new EventDto
+        {
+            Title = "Test Event",
+            StartAt = futureDate,
+            EndAt = futureDate.AddHours(2),
+            TotalSeats = totalSeats
+        });
+        return created.Id;
+    }
+
+    [Fact]
         public async Task Event_TryReserveSeats_ConcurrentRequests_RespectsSeatLimit()
         {
             // Arrange
@@ -111,53 +151,54 @@ public class ConcurrentTests
     }
 
 
-    // тест на уникальность Id при 10 одновременных вызовах CreateBookingAsync через BookingService
     [Fact]
-    public async Task CreateBookingAsync_IdsAreUniqueUnderConcurrency()
+    public async Task CreateBookingAsync_ConcurrentRequests_DoesNotOverbookEvent()
     {
-        // Arrange
-        var eventId = Guid.NewGuid();
-        var eventRepoMock = new Mock<IEventRepository>();
-        var bookingRepoMock = new Mock<IBookingRepository>();
+        const int totalSeats = 5;
+        const int concurrentRequests = 20;
+        var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
 
-        var @event = TestDataFactory.CreateTestEvent(totalSeats: 10);
-        eventRepoMock.Setup(r => r.GetById(eventId))
-            .Returns(@event);
-
-        // Мок обновления
-        eventRepoMock.Setup(r => r.Update(It.IsAny<Event>()))
-            .Returns(() =>
-            {
-                // Нужно имитировать уменьшение AvailableSeats — см. ниже
-                return true;
-            });
-
-        // Мок добавления брони
-        bookingRepoMock.Setup(r => r.Add(It.IsAny<Booking>()));
-
-        var service =new BookingService(bookingRepoMock.Object, eventRepoMock.Object);
-
-        var successfulIds = new List<Guid>();
-        var lockObj = new object();
-
-        // Act: 10 конкурентных вызовов CreateBookingAsync
-        var tasks = Enumerable.Range(1, 10)
+        var tasks = Enumerable.Range(0, concurrentRequests)
             .Select(_ => Task.Run(async () =>
             {
-                var result = await service.CreateBookingAsync(eventId);
-                lock (lockObj)
+                using var scope = _serviceProvider.CreateScope();
+                var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+                try
                 {
-                    successfulIds.Add(result.Id);
+                    await bookingService.CreateBookingAsync(eventId);
+                    return true;
                 }
-            }))
-            .ToArray();
+                catch (NoAvailableSeatsException)
+                {
+                    return false;
+                }
+            }));
+
+        var results = await Task.WhenAll(tasks);
+
+        var successCount = results.Count(r => r);
+        Assert.Equal(totalSeats, successCount);
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_ConcurrentRequests_AllSuccessfulBookingsHaveUniqueIds()
+    {
+        const int totalSeats = 10;
+        const int concurrentRequests = 10;
+        var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
+        var bookingIds = new System.Collections.Concurrent.ConcurrentBag<Guid>();
+
+        var tasks = Enumerable.Range(0, concurrentRequests)
+            .Select(_ => Task.Run(async () =>
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+                var booking = await bookingService.CreateBookingAsync(eventId);
+                bookingIds.Add(booking.Id);
+            }));
 
         await Task.WhenAll(tasks);
 
-        // Assert: все Id уникальны
-        Assert.Equal(10, successfulIds.Count);
-        successfulIds.Distinct().Count().Should().Be(10,
-            "Все 10 вызовов CreateBookingAsync должны вернуть уникальные Id.");
+        Assert.Equal(totalSeats, bookingIds.Distinct().Count());
     }
-
 }

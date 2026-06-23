@@ -1,11 +1,11 @@
-using System.Reflection;
-using Microsoft.AspNetCore.Mvc;
-using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Application.Services;
-using EventMgtApi.Infrastructure.Repositories;
 using EventMgtApi.Infrastructure.BackgroundServices;
-using EventMgtApi.Presentation.Filters;
+using EventMgtApi.Infrastructure.DataAccess;
 using EventMgtApi.Presentation.Extensions;
+using EventMgtApi.Presentation.Filters;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +15,6 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 });
 
 // Регистрация контроллеров
-//builder.Services.AddControllers();
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ThrowValidationExceptionFilter>();
@@ -25,9 +24,9 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 
-builder.Services.AddSingleton<IEventRepository, InMemoryEventRepository>();
-builder.Services.AddSingleton<IEventService, EventService>();
-builder.Services.AddSingleton<IBookingRepository, InMemoryBookingRepository>();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
 // Регистрация фонового сервиса
@@ -44,6 +43,13 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Создания объектов БД
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
 
 // Настройка конвейера обработки запросов
 if (app.Environment.IsDevelopment())

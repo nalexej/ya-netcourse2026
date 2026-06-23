@@ -16,14 +16,16 @@ public interface IBookingService
     /// Статус брони устанавливается в <see cref="BookingStatus.Pending"/>.
     /// </summary>
     /// <param name="eventId">Идентификатор события, для которого создаётся бронь.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>DTO созданной брони.</returns>
-    Task<BookingResponseDto> CreateBookingAsync(Guid eventId);
+    Task<BookingResponseDto> CreateBookingAsync(Guid eventId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Асинхронно получает бронь по идентификатору.
     /// </summary>
     /// <param name="bookingId">Уникальный идентификатор брони.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>DTO найденной брони.</returns>
     /// <exception cref="NotFoundException">Выбрасывается, если бронь с указанным ID не найдена.</exception>
-    Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId);
+    Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId, CancellationToken cancellationToken = default);
 }

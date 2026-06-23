@@ -1,6 +1,4 @@
-﻿using EventMgtApi.Application.DTOs;
-using System.ComponentModel.DataAnnotations;
-using ValidationException = EventMgtApi.Domain.Exceptions.ValidationException;
+﻿using ValidationException = EventMgtApi.Domain.Exceptions.ValidationException;
 
 namespace EventMgtApi.Domain.Entities
 {
@@ -10,6 +8,9 @@ namespace EventMgtApi.Domain.Entities
     /// </summary>
     public class Event
     {
+
+        #region Properties
+
         /// <summary>
         /// Уникальный идентификатор события.
         /// </summary>
@@ -46,6 +47,22 @@ namespace EventMgtApi.Domain.Entities
         public int AvailableSeats { get; set; }
 
         /// <summary>
+        /// Навигационное свойство: список бронирований.
+        /// </summary>
+        public ICollection<Booking> Bookings { get; private set; } = [];
+ 
+        #endregion
+
+        #region Constructors
+
+        // Приватный конструктор без параметров для ORM
+        private Event() { }
+
+        #endregion
+
+        #region Factory Methods
+
+        /// <summary>
         /// Создаёт новое событие с валидацией TotalSeats.
         /// </summary>
         /// <param name="title">Заголовок события.</param>
@@ -57,19 +74,11 @@ namespace EventMgtApi.Domain.Entities
         /// <exception cref="ValidationException">Если totalSeats меньше либо равно 0.</exception>
         public static Event Create(string? title, DateTime startAt, DateTime endAt, int totalSeats, string? description = null)
         {
-            if (string.IsNullOrWhiteSpace(title))
-                throw new ValidationException("Заголовок обязателен.");
-
-            if (totalSeats <= 0)
-                throw new ValidationException("Общее количество мест должно быть больше нуля.");
-
-            if (startAt >= endAt)
-                throw new ValidationException("Дата начала должна быть раньше даты окончания.");
-
+            ThrowIfNotValid(title, startAt, endAt, totalSeats);
             return new Event
             {
                 Id = Guid.NewGuid(),
-                Title = title,
+                Title = title!.Trim(),
                 Description = description ?? string.Empty,
                 StartAt = startAt,
                 EndAt = endAt,
@@ -77,6 +86,28 @@ namespace EventMgtApi.Domain.Entities
                 AvailableSeats = totalSeats
             };
         }
+
+        #endregion
+
+        /// <summary>
+        /// Обновляеи существующее событие.
+        /// </summary>
+        /// <param name="title">Заголовок события.</param>
+        /// <param name="startAt">Дата и время начала.</param>
+        /// <param name="endAt">Дата и время окончания.</param>
+        /// <param name="description">Описание события (опционально).</param>
+        /// <returns>Обновленная сущность Event.</returns>
+        /// <exception cref="ValidationException">Если totalSeats меньше либо равно 0.</exception>
+        public void Update(string? title, DateTime? startAt, DateTime? endAt, string? description = null)
+        {
+            ThrowIfNotValid(title, startAt, endAt, TotalSeats);
+            Title = title!;
+            StartAt = startAt!.Value;
+            EndAt = endAt!.Value;
+            Description = description;
+        }
+
+        #region Methods
 
         /// <summary>
         /// Пытается зарезервировать указанное количество мест.
@@ -107,5 +138,47 @@ namespace EventMgtApi.Domain.Entities
 
             AvailableSeats = Math.Min(AvailableSeats + count, TotalSeats);
         }
+
+        private static void ThrowIfNotValid(
+            string? title,
+            DateTime? startAt,
+            DateTime? endAt,
+            int? totalSeats)
+        {
+            var errors = new Dictionary<string, ICollection<string>>();
+
+            if (string.IsNullOrWhiteSpace(title))
+                AddError(errors, nameof(Title), "Заголовок обязателен.");
+
+            if (!startAt.HasValue)
+                AddError(errors, nameof(StartAt), "Дата начала обязательна.");
+
+            if (!endAt.HasValue)
+                AddError(errors, nameof(EndAt), "Дата окончания обязательна.");
+
+            if (startAt < DateTime.UtcNow)
+                AddError(errors, nameof(StartAt), "Дата начала не должна быть в прошлом.");
+
+            if (startAt >= endAt)
+                AddError(errors, nameof(StartAt), "Дата начала должна быть раньше даты окончания.");
+
+            if (!totalSeats.HasValue || totalSeats.Value <= 0)
+                AddError(errors, nameof(TotalSeats), "Общее количество мест должно быть больше нуля.");
+
+            if (errors.Any())
+                throw new ValidationException(errors);
+
+        }
+
+        private static void AddError(Dictionary<string, ICollection<string>> errors, string field, string message)
+        {
+            if (!errors.ContainsKey(field))
+                errors[field] = new List<string>();
+
+            errors[field].Add(message);
+        }
+
+        #endregion
+
     }
 }

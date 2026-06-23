@@ -78,9 +78,17 @@ public class GlobalExceptionHandlingMiddleware
     private async Task HandleValidationExceptionAsync(HttpContext context, ValidationException ex)
     {
         // Логируем детали валидации
-        var errorMessages = string.Join("; ", ex.ModelState
+        var errorMessages = ex switch
+        {
+            _ when ex?.ModelState != null
+                => string.Join("; ", ex.ModelState
             .Where(kv => kv.Value?.Errors.Count > 0)
-            .SelectMany(kv => kv.Value!.Errors.Select(e => $"{kv.Key}: {e.ErrorMessage}")));
+            .SelectMany(kv => kv.Value!.Errors.Select(e => $"{kv.Key}: {e.ErrorMessage}"))),
+
+            _ =>  string.Join("; ", ex!.Errors
+            .Where(kv => kv.Value != null)
+            .SelectMany(kv => kv.Value.Select(v => $"{kv.Key}: {v}"))),
+        };
 
         _logger.LogError(
             "Ошибка валидации. Method={Method}, Path={Path}, Errors={Errors}, RequestId={RequestId}",
@@ -97,12 +105,30 @@ public class GlobalExceptionHandlingMiddleware
             Instance = context.Request.Path,
         };
 
-        var errors = ex.ModelState
-            .Where(kv => kv.Value?.Errors.Count > 0)
-            .ToDictionary(
-                kv => kv.Key,
-                kv => (object?)kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
-            );
+        var errors = ex switch
+        {
+            _ when ex?.ModelState != null
+                  =>
+                ex.ModelState
+                    .Where(kv => kv.Value?.Errors.Count > 0)
+                    .ToDictionary(
+                        kv => kv.Key,
+                        kv => kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
+                    ),
+
+
+            _ when ex?.Errors != null
+                  =>
+                ex?.Errors
+                .Where(kv => kv.Value != null)
+                .ToDictionary(
+                    kv => kv.Key,
+                    kv => kv.Value.Select(e => e.ToString()).ToArray()
+                ),
+            _
+              => new Dictionary<string, string[]>()
+        };
+
 
         details.Extensions["errors"] = errors;
 

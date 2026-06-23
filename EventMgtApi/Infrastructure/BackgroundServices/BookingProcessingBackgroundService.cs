@@ -1,10 +1,7 @@
 ﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
-using EventMgtApi.Domain.Interfaces;
-using Microsoft.Extensions.Hosting;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+using EventMgtApi.Infrastructure.DataAccess;
+using Microsoft.EntityFrameworkCore;
 
 namespace EventMgtApi.Infrastructure.BackgroundServices;
 
@@ -15,38 +12,27 @@ namespace EventMgtApi.Infrastructure.BackgroundServices;
 /// </summary>
 public class BookingProcessingBackgroundService : BackgroundService
 {
-    private readonly IBookingRepository _bookingRepository;
-    private readonly IEventRepository _eventRepository;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookingProcessingBackgroundService> _logger;
-    private readonly SemaphoreSlim _processingSemaphore = new(1, 1);
-
     private readonly TimeSpan _pollingInterval = TimeSpan.FromSeconds(5);
     private readonly TimeSpan _processingDelay = TimeSpan.FromSeconds(2);
     private readonly int _seatsToReleaseOnReject = 1;
 
     /// <summary>
-    /// Инициализирует новый экземпляр сервиса с указанным репозиторием и логгером.
+    /// Инициализирует новый экземпляр фонового сервиса.
     /// </summary>
-    /// <param name="bookingRepository">
-    /// Репозиторий для доступа к данным о бронях. Не должен быть null.
-    /// </param>
-    /// <param name="eventRepository">
-    /// Репозиторий для доступа к данным о событиях. Не должен быть null.
+    /// <param name="scopeFactory">
+    /// Фвбрика scope.
     /// </param>
     /// <param name="logger">
     /// Служба логирования. Используется для записи информации о работе фонового процесса.
     /// </param>
-    /// <exception cref="ArgumentNullException">
-    /// Выбрасывается, если <paramref name="bookingRepository"/> или <paramref name="logger"/> равны null.
-    /// </exception>
     public BookingProcessingBackgroundService(
-        IBookingRepository bookingRepository,
-        IEventRepository eventRepository,
+        IServiceScopeFactory scopeFactory,
         ILogger<BookingProcessingBackgroundService> logger)
     {
-        _bookingRepository = bookingRepository ?? throw new ArgumentNullException(nameof(bookingRepository));
-        _eventRepository = eventRepository ?? throw new ArgumentNullException(nameof(eventRepository));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     /// <summary>
@@ -100,11 +86,12 @@ public class BookingProcessingBackgroundService : BackgroundService
     /// - Если событие не найдено — бронь отклоняется, место возвращается в пул.
     /// - При неожиданной ошибке — бронь отклоняется, место возвращается, обновляются оба хранилища.
     /// </summary>
-    /// <param name="booking">Бронь для обработки.</param>
+    /// <param name="bookingId">Идентификатор брони для обработки.</param>
     /// <param name="stoppingToken">Токен отмены.</param>
     /// <returns>Задача, представляющая асинхронную операцию обработки.</returns>
-    private async Task ProcessBookingAsync(Booking booking, CancellationToken stoppingToken)
+    private async Task ProcessBookingAsync(Guid bookingId, CancellationToken stoppingToken)
     {
+
         // Имитация внешнего вызова выполняется ДО захвата семафора
         try
         {
@@ -112,62 +99,70 @@ public class BookingProcessingBackgroundService : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            _logger.LogDebug("Задержка обработки брони {BookingId} прервана отменой.", booking.Id);
+            _logger.LogDebug("Задержка обработки брони {BookingId} прервана отменой.", bookingId);
             return;
         }
-
-        // Критическая секция: захват семафора для защиты записи в хранилище
-        await _processingSemaphore.WaitAsync(stoppingToken);
 
         try
         {
             // Получаем событие из хранилища
-            var @event = await _eventRepository.GetByIdAsync(booking.EventId);
+            using var scope = _scopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
+            if (booking == null || booking.Status != BookingStatus.Pending)
+                return;
+
+            var @event = await context.Events.FirstOrDefaultAsync(e => e.Id == booking.EventId, stoppingToken);
+
             if (@event is null)
             {
                 // Событие не найдено — просто отклоняем бронь
-                booking.Reject();
-
+                booking!.Reject();
+                await context.SaveChangesAsync(stoppingToken);
                 _logger.LogWarning("Событие {EventId} не найдено для брони {BookingId}. Отклоняем бронь.",
                     booking.EventId, booking.Id);
 
-                var updated = await _bookingRepository.UpdateAsync(booking);
                 _logger.LogDebug("Бронь {BookingId} отклонена (событие не найдено).", booking.Id);
                 return;
             }
 
             // Событие найдено — подтверждаем бронь
-            booking.Confirm();
-            await _bookingRepository.UpdateAsync(booking);
+            booking!.Confirm();
+            await context.SaveChangesAsync(stoppingToken);
             _logger.LogDebug("Бронь {BookingId} подтверждена.", booking.Id);
 
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            _logger.LogDebug("Обработка брони {BookingId} прервана отменой.", booking.Id);
+            _logger.LogDebug("Обработка брони {BookingId} прервана отменой.", bookingId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при обработке брони {BookingId}", booking.Id);
-
-            // Получаем событие
-            var @event = await _eventRepository.GetByIdAsync(booking.EventId);
-            if (@event is not null)
+            try
             {
-                @event.ReleaseSeats(_seatsToReleaseOnReject); // возвращаем место
-                await _eventRepository.UpdateAsync(@event);
+                using var scope = _scopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                // перечитываем на всякий случай
+                var bkg = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
+                if (bkg != null)
+                {
+                    bkg.Reject();
+                    var @evt = await context.Events.FirstOrDefaultAsync(e => e.Id == bkg.EventId, stoppingToken);
+                    if (@evt is not null)
+                    {
+                        @evt.ReleaseSeats(_seatsToReleaseOnReject); // возвращаем место
+                        await context.SaveChangesAsync(stoppingToken);
+                    }
+                }
+                _logger.LogError(ex, "Бронь {BookingId} отклонена в ходе обработки возникшей ошибки.", bookingId);
+            }
+            catch (Exception releaseEx)
+            {
+                _logger.LogError(releaseEx, "Не удалось отклонить Бронь {BookingId} в ходе обработки возникшей ошибки", bookingId);
             }
 
-            booking.Reject();
-            await _bookingRepository.UpdateAsync(booking);
-
-            _logger.LogWarning("Бронь {BookingId} отклонена после ошибки. Место возвращено: {EventExists}.",
-                booking.Id, @event is not null);
-        }
-        finally
-        {
-            // освобождаем семафор
-            _processingSemaphore.Release();
         }
     }
 
@@ -189,19 +184,25 @@ public class BookingProcessingBackgroundService : BackgroundService
     {
         try
         {
-            var pendingBookings = (await _bookingRepository.GetByStatusAsync(BookingStatus.Pending)).ToList();
-
-            if (!pendingBookings.Any())
+            List<Guid> pendingBookingsIds;
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                pendingBookingsIds = await context.Bookings
+                    .Where(b => b.Status == BookingStatus.Pending)
+                    .Select(b => b.Id)
+                    .ToListAsync(stoppingToken);
+            }
+            if (!pendingBookingsIds.Any())
             {
                 _logger.LogDebug("Нет броней в статусе Pending — пропуск обработки.");
                 return;
             }
+            _logger.LogInformation("Найдено {Count} ожидающих броней для обработки.", pendingBookingsIds.Count);
 
-            _logger.LogInformation("Найдено {Count} ожидающих броней для обработки.", pendingBookings.Count);
+            var tasks = pendingBookingsIds.Select(bookingId => ProcessBookingAsync(bookingId, stoppingToken));
 
-            var tasks = pendingBookings.Select(booking => ProcessBookingAsync(booking, stoppingToken));
             await Task.WhenAll(tasks);
-
             _logger.LogInformation("Обработка ожидающих броней завершена.");
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
