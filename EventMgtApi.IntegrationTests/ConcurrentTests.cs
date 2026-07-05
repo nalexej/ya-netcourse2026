@@ -1,0 +1,263 @@
+﻿using EventMgtApi.Application.Services;
+using EventMgtApi.Domain.Entities;
+using EventMgtApi.Domain.Enums;
+using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Domain.Interfaces;
+using EventMgtApi.Infrastructure.DataAccess;
+using EventMgtApi.Infrastructure.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using Testcontainers.PostgreSql;
+using FluentAssertions;
+
+namespace EventMgtApi.IntegrationTests;
+
+public class ConcurrentTests : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
+        .WithDatabase("eventapi")
+        .WithUsername("postgres")
+        .WithPassword("postgres")
+        .Build();
+
+    public async Task InitializeAsync() => await _postgres.StartAsync();
+    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+
+    private AppDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
+            .Options;
+
+        var context = new AppDbContext(options);
+        context.Database.EnsureCreated();
+        return context;
+    }
+
+    private async Task ResetDatabaseAsync()
+    {
+        await using var context = CreateContext();
+        await context.Database.EnsureDeletedAsync();
+        await context.Database.MigrateAsync();
+    }
+
+    private IServiceScope CreateScope()
+    {
+        var services = new ServiceCollection();
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseNpgsql(_postgres.GetConnectionString()));
+        services.AddScoped<IEventRepository, EventRepository>();
+        services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IEventService, EventService>();
+        services.AddScoped<IBookingService, BookingService>();
+
+        var serviceProvider = services.BuildServiceProvider();
+        return serviceProvider.CreateScope();
+    }
+
+    private async Task<Guid> CreateTestEventAsync(int totalSeats = 10)
+    {
+        await using var context = CreateContext();
+        var @event = Event.Create(
+            title: "Concurrent Test Event",
+            startAt: DateTime.UtcNow.AddHours(1),
+            endAt: DateTime.UtcNow.AddHours(2),
+            totalSeats: totalSeats,
+            description: "Test");
+
+        context.Events.Add(@event);
+        await context.SaveChangesAsync();
+
+        return @event.Id;
+    }
+
+    [Fact]
+    public async Task ReserveSeats_ConcurrentRequests_RespectsSeatLimit()
+    {
+        // Arrange
+        await ResetDatabaseAsync();
+
+        var eventId = await CreateTestEventAsync(totalSeats: 5);
+        const int concurrentRequests = 20;
+
+        var successfulReservations = new ConcurrentBag<int>();
+        var lockObj = new object();
+
+        // Act: 20 concurrent запросов на резервирование по 1 месту
+        var tasks = Enumerable.Range(1, concurrentRequests)
+            .Select(i => Task.Run(async () =>
+            {
+                try
+                {
+                    // Создаём новый scope для каждого запроса — чтобы каждый получил свой DbContext
+                    using var scope = CreateScope();
+                    var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+
+                    await bookingService.CreateBookingAsync(eventId);
+                    lock (lockObj)
+                    {
+                        successfulReservations.Add(i);
+                    }
+                }
+                catch (NoAvailableSeatsException)
+                {
+                    // Недостаточно мест — это нормально
+                }
+                catch (NotFoundException)
+                {
+                    // Событие не найдено — ошибка, но в данном случае не должно случиться
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Concurrency conflict — также нормально
+                }
+            }))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        // Assert
+        successfulReservations.Count.Should().Be(5,
+            $"Должно быть ровно 5 успешных резервирований, но получено {successfulReservations.Count}.");
+
+        // Проверяем актуальное состояние через новый контекст
+        await using var verifyCtx = CreateContext();
+        var @event = await verifyCtx.Events.FindAsync(eventId);
+        @event!.AvailableSeats.Should().Be(0,
+            "Должно быть 0 доступных мест после всех резервирований.");
+    }
+
+    [Fact]
+    public async Task Booking_Creation_IsUniqueUnderConcurrency()
+    {
+        await ResetDatabaseAsync();
+
+        var @event = Event.Create("Test", DateTime.UtcNow.AddHours(1), DateTime.UtcNow.AddHours(2), 10, "Test");
+        await using var ctx = CreateContext();
+        ctx.Events.Add(@event);
+        await ctx.SaveChangesAsync();
+
+        var eventId = @event.Id;
+        var totalBookings = 10;
+
+        var tasks = Enumerable.Range(1, totalBookings)
+            .Select(_ => Task.Run(async () =>
+            {
+                using var scope = CreateScope();
+                var bookingRepo = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+                var booking = new Booking(eventId);
+                await bookingRepo.AddAsync(booking, CancellationToken.None);
+                await bookingRepo.SaveChangesAsync();
+            }))
+            .ToArray();
+
+        await Task.WhenAll(tasks);
+
+        // Assert: проверяем в БД
+        await using var verifyCtx = CreateContext();
+        var verifyRepo = new BookingRepository(verifyCtx);
+        var savedBookings = await verifyRepo.GetAllAsync();
+
+        savedBookings.Should().HaveCount(totalBookings,
+            $"Должно быть {totalBookings} броней, но получено {savedBookings.Count()}");
+
+        var ids = savedBookings.Select(b => b.Id).ToList();
+        ids.Distinct().Should().HaveCount(totalBookings,
+            $"Все брони должны иметь уникальные Id, но найдено {ids.Count - ids.Distinct().Count()} дубликатов.");
+
+        savedBookings.All(b => b.EventId == eventId).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_ConcurrentRequests_DoesNotOverbookEvent()
+    {
+        const int totalSeats = 5;
+        const int concurrentRequests = 20;
+        var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
+
+        var tasks = Enumerable.Range(0, concurrentRequests)
+            .Select(_ => Task.Run(async () =>
+            {
+                using var scope = CreateScope();
+                var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+                try
+                {
+                    await bookingService.CreateBookingAsync(eventId);
+                    return true;
+                }
+                catch (NoAvailableSeatsException)
+                {
+                    return false;
+                }
+            }));
+
+        var results = await Task.WhenAll(tasks);
+
+        var successCount = results.Count(r => r);
+        Assert.Equal(totalSeats, successCount);
+    }
+
+    [Fact]
+    public async Task CreateBookingAsync_ConcurrentRequests_AllSuccessfulBookingsHaveUniqueIds()
+    {
+        const int totalSeats = 10;
+        const int concurrentRequests = 10;
+        var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
+        var bookingIds = new System.Collections.Concurrent.ConcurrentBag<Guid>();
+
+        var tasks = Enumerable.Range(0, concurrentRequests)
+            .Select(_ => Task.Run(async () =>
+            {
+                using var scope = CreateScope();
+                var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+                var booking = await bookingService.CreateBookingAsync(eventId);
+                bookingIds.Add(booking.Id);
+            }));
+
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(totalSeats, bookingIds.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task ReserveSeats_Overbooking_ThrowsValidationException()
+    {
+        await ResetDatabaseAsync();
+
+        const int totalSeats = 2;
+        var @event = Event.Create(
+            "Test Event",
+            DateTime.UtcNow.AddHours(1),
+            DateTime.UtcNow.AddHours(3),
+            totalSeats,
+            "Test");
+
+        await using var ctx = CreateContext();
+        ctx.Events.Add(@event);
+        await ctx.SaveChangesAsync();
+
+        var eventId = @event.Id;
+
+        // Занять все места
+        for (int i = 0; i < totalSeats; i++)
+        {
+            using var scope = CreateScope();
+            var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
+            await bookingService.CreateBookingAsync(eventId);
+        }
+
+        // Проверить, что мест нет
+        await using var verifyCtx = CreateContext();
+        var verifiedEvent = await verifyCtx.Events.FindAsync(eventId);
+        verifiedEvent!.AvailableSeats.Should().Be(0, "все места должны быть заняты");
+
+        // Попытаться занять ещё 1 — должно выбросить ValidationException
+        using var failScope = CreateScope();
+        var failBookingService = failScope.ServiceProvider.GetRequiredService<IBookingService>();
+
+        await Assert.ThrowsAsync<NoAvailableSeatsException>(() =>
+            failBookingService.CreateBookingAsync(eventId));
+    }
+}

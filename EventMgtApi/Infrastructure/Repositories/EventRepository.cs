@@ -55,10 +55,10 @@ namespace EventMgtApi.Infrastructure.Repositories
             // Получаем все события
             var query = _context.Events.AsQueryable();
 
-            // Применяем фильтры
             if (!string.IsNullOrWhiteSpace(title))
             {
-                query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
+                var pattern = $"%{title}%";
+                query = query.Where(e => EF.Functions.ILike(e.Title, pattern));
             }
 
             if (from.HasValue)
@@ -72,7 +72,7 @@ namespace EventMgtApi.Infrastructure.Repositories
             }
 
             // Подсчитываем общее количество
-            var totalCount = await query.CountAsync(ct);
+            var totalCount = await query.CountAsync();
 
             // Пагинация
             var items = await query
