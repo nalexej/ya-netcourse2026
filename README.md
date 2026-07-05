@@ -63,6 +63,7 @@ API предоставляет полный цикл операций **CRUD**:
 
 ---
 
+
 ## 🛠 Технологии
 
 - **.NET 10** / **C# 12**
@@ -109,15 +110,26 @@ PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE ev
 } 
 ```
 
-Cхема базы данных создаётся автоматически при запуске (Program.cs):
+#### 🧱 Миграции с Entity Framework Core
 
-```csharp
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
-}
-```csharp
+Схема базы данных управляется через **миграции EF Core**.
+
+##### Создание миграции
+
+После изменения модели (`AppDbContext`, сущностей и т.п.) создайте новую миграцию:
+
+```bash
+dotnet ef migrations add <Название_миграции>
+```
+
+##### Применение миграций
+В момент запуска приложение автоматически применяет миграции к базе данных
+Для ручного применения миграций используйте команду:
+
+```bash
+dotnet ef database update
+```
+
 
 ### Сборка и запуск
 В корне репозитория выполните:
@@ -477,6 +489,9 @@ EventMgtApi/
 │       └── EventMappingExtensions.cs # Методы ToDtoResponse(), ToDtoList()
 │
 ├── Infrastructure/               # Внешние реализации
+│   ├── Repositories/
+│   │   └── BookingRepository/ # Репозиторий для доступа к данным бронирований
+│   │   └── EventRepository/ # Репозиторий для доступа к данным событий
 │   ├── DataAccess/
 │   │   └── Configurations/ # Конфигурации объектов в базе данных
 │   │   	└── BookingConfiguration.cs # Бронирования
@@ -496,7 +511,9 @@ EventMgtApi/
 │   └── Extensions/
 │       └── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
 │
-├── Program.cs                    # Настройка DI, слоёв, маршрутов, Swagger
+├── Migrations/               # Миграции
+│
+├── Program.cs                # Настройка DI, слоёв, маршрутов, Swagger
 └── Properties/
 └── launchSettings.json       # Конфигурация запуска (HTTPS, порт 7001)
 ```
@@ -528,16 +545,39 @@ EventMgtApi/
 
 ---
 
-### 🧱 Тесты
+## 🧱 Тесты
+
+### Unit-тесты
 
 Реализованы unit-тесты для:
 - сервисов `EventService`, `BookingService`, `BookingProcessingBackgroundService`.
 - сущностей `Event` и `Booking`
 
-Добавлены тесты на конкурентность.
+Запуск unit-тестов (в корне репозитория):
 
-Запуск тестов (в корне репозитория):
+```bash
+dotnet test EventMgtApi.Tests/EventMgtApiTests.csproj
+```
 
+### Интеграционные тесты
+
+В проект включены интеграционные тесты (EventMgtApi.IntegrationTests), которые проверяют взаимодействие с базой данных через реальный AppDbContext.
+К интеграционным тестам также добавлены тесты на конкурентность.
+
+Для запуска интеграционных тестов требуется Docker — тестовый контейнер с PostgreSQL запускается автоматически через testcontainers.
+
+Требования
+Установленный Docker
+.NET 10+ SDK (используется EF Core 10 — актуально на текущий момент)
+
+Запуск интеграционных тестов (в корне репозитория):
+
+```bash
+dotnet test EventMgtApi.IntegrationTests/EventMgtApi.IntegrationTests.csproj
+```
+> 💡 При первом запуске Docker скачает образ postgres:16-alpine
+
+Запуск всех тестов сразу (в корне репозитория):
 ```bash
 dotnet test
 ```
