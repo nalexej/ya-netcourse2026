@@ -2,6 +2,7 @@
 using EventMgtApi.Application.Extensions;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -15,15 +16,19 @@ namespace EventMgtApi.Application.Services;
 public class BookingService : IBookingService
 {
     private static readonly SemaphoreSlim BookingLock = new(1, 1);
-    private readonly AppDbContext _context;
+
+    private readonly IEventRepository _eventrepository;
+    private readonly IBookingRepository _bookingrepository;
 
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="BookingService"/>.
     /// </summary>
-    /// <param name="context">Контекст базы данных</param>
-    public BookingService(AppDbContext context)
+    /// <param name="eventRepository">Репозиторий для доступа к данным событий. Не должен быть <see langword="null"/>.</param>
+    /// <param name="bookingRepository">Репозиторий для доступа к данным бронирований. Не должен быть <see langword="null"/>.</param>
+    public BookingService(IEventRepository eventRepository, IBookingRepository bookingRepository)
     {
-        _context = context;
+        _eventrepository = eventRepository;
+        _bookingrepository = bookingRepository;
     }
 
     /// <inheritdoc />
@@ -36,7 +41,7 @@ public class BookingService : IBookingService
         await BookingLock.WaitAsync(cancellationToken);
         try
         {
-            @event = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId, cancellationToken)
+            @event = await _eventrepository.GetByIdAsync(eventId, cancellationToken)
                 ?? throw new NotFoundException($"Событие с ID {eventId} не найдено.");
 
             // Пытаемся зарезервировать место
@@ -45,8 +50,10 @@ public class BookingService : IBookingService
 
             // Создаём бронь
             var booking = new Booking(eventId);
-            await _context.Bookings.AddAsync(booking, cancellationToken);
-            await _context.SaveChangesAsync(cancellationToken);
+
+            await _bookingrepository.AddAsync(booking, cancellationToken);
+            await _bookingrepository.SaveChangesAsync(cancellationToken);
+
             return booking.ToDtoResponse();
         }
         finally
@@ -60,8 +67,8 @@ public class BookingService : IBookingService
     {
         if (bookingId == Guid.Empty)
             throw new ArgumentException("Идентификатор брони не может быть пустым.", nameof(bookingId));
-        
-        var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId, cancellationToken)
+
+        var booking = await _bookingrepository.GetByIdAsync(bookingId, cancellationToken)
             ?? throw new NotFoundException($"Бронь с ID {bookingId} не найдена.");
 
         return booking.ToDtoResponse();

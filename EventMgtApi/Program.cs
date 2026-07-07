@@ -1,6 +1,8 @@
 using EventMgtApi.Application.Services;
+using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.BackgroundServices;
 using EventMgtApi.Infrastructure.DataAccess;
+using EventMgtApi.Infrastructure.Repositories;
 using EventMgtApi.Presentation.Extensions;
 using EventMgtApi.Presentation.Filters;
 using Microsoft.AspNetCore.Mvc;
@@ -29,6 +31,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 
+builder.Services.AddScoped<IEventRepository, EventRepository>();
+builder.Services.AddScoped<IBookingRepository, BookingRepository>();
+
+
 // Регистрация фонового сервиса
 builder.Services.AddHostedService<BookingProcessingBackgroundService>();
 
@@ -48,7 +54,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 // Настройка конвейера обработки запросов

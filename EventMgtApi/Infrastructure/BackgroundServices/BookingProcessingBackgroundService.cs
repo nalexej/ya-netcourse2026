@@ -1,6 +1,8 @@
 ﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
+using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.DataAccess;
+using EventMgtApi.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventMgtApi.Infrastructure.BackgroundServices;
@@ -107,19 +109,21 @@ public class BookingProcessingBackgroundService : BackgroundService
         {
             // Получаем событие из хранилища
             using var scope = _scopeFactory.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var booking = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
+            var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+            var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+
+            var booking = await bookingRepository.GetByIdAsync(bookingId, stoppingToken);
             if (booking == null || booking.Status != BookingStatus.Pending)
                 return;
 
-            var @event = await context.Events.FirstOrDefaultAsync(e => e.Id == booking.EventId, stoppingToken);
-
+            var @event = await eventRepository.GetByIdAsync(booking.EventId, stoppingToken);
             if (@event is null)
             {
                 // Событие не найдено — просто отклоняем бронь
                 booking!.Reject();
-                await context.SaveChangesAsync(stoppingToken);
+                await bookingRepository.SaveChangesAsync(stoppingToken);
+
                 _logger.LogWarning("Событие {EventId} не найдено для брони {BookingId}. Отклоняем бронь.",
                     booking.EventId, booking.Id);
 
@@ -129,7 +133,7 @@ public class BookingProcessingBackgroundService : BackgroundService
 
             // Событие найдено — подтверждаем бронь
             booking!.Confirm();
-            await context.SaveChangesAsync(stoppingToken);
+            await bookingRepository.SaveChangesAsync(stoppingToken);
             _logger.LogDebug("Бронь {BookingId} подтверждена.", booking.Id);
 
         }
@@ -142,18 +146,21 @@ public class BookingProcessingBackgroundService : BackgroundService
             try
             {
                 using var scope = _scopeFactory.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+                var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
 
                 // перечитываем на всякий случай
-                var bkg = await context.Bookings.FirstOrDefaultAsync(b => b.Id == bookingId, stoppingToken);
+                var bkg = await bookingRepository.GetByIdAsync(bookingId, stoppingToken);
+
                 if (bkg != null)
                 {
                     bkg.Reject();
-                    var @evt = await context.Events.FirstOrDefaultAsync(e => e.Id == bkg.EventId, stoppingToken);
+                    var evt = await eventRepository.GetByIdAsync(bkg.EventId, stoppingToken);
+
                     if (@evt is not null)
                     {
                         @evt.ReleaseSeats(_seatsToReleaseOnReject); // возвращаем место
-                        await context.SaveChangesAsync(stoppingToken);
+                        await eventRepository.SaveChangesAsync(stoppingToken);
                     }
                 }
                 _logger.LogError(ex, "Бронь {BookingId} отклонена в ходе обработки возникшей ошибки.", bookingId);
@@ -184,21 +191,19 @@ public class BookingProcessingBackgroundService : BackgroundService
     {
         try
         {
-            List<Guid> pendingBookingsIds;
+            IEnumerable<Guid> pendingBookingsIds;
             using (var scope = _scopeFactory.CreateScope())
             {
-                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                pendingBookingsIds = await context.Bookings
-                    .Where(b => b.Status == BookingStatus.Pending)
-                    .Select(b => b.Id)
-                    .ToListAsync(stoppingToken);
+                var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+                pendingBookingsIds = await bookingRepository.GetPendingBookingsIdsAsync(stoppingToken);
+
             }
             if (!pendingBookingsIds.Any())
             {
                 _logger.LogDebug("Нет броней в статусе Pending — пропуск обработки.");
                 return;
             }
-            _logger.LogInformation("Найдено {Count} ожидающих броней для обработки.", pendingBookingsIds.Count);
+            _logger.LogInformation("Найдено {Count} ожидающих броней для обработки.", pendingBookingsIds.Count());
 
             var tasks = pendingBookingsIds.Select(bookingId => ProcessBookingAsync(bookingId, stoppingToken));
 

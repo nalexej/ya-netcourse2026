@@ -2,6 +2,7 @@
 using EventMgtApi.Application.Extensions;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,15 +15,15 @@ namespace EventMgtApi.Application.Services;
 /// </summary>
 public sealed class EventService : IEventService
 {
-    private readonly AppDbContext _context;
+    private readonly IEventRepository _repository;
 
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="EventService"/>.
     /// </summary>
-    /// <param name="context">Контекст базы данных</param>
-    public EventService(AppDbContext context)
+    /// <param name="repository">Репозиторий для доступа к данным. Не должен быть <see langword="null"/>.</param>
+    public EventService(IEventRepository repository)
     {
-        _context = context;
+        _repository = repository;
     }
 
     /// <inheritdoc />
@@ -37,50 +38,23 @@ public sealed class EventService : IEventService
         // Защита от некорректных значений
         page = Math.Max(1, page);
         pageSize = Math.Max(1, Math.Min(100, pageSize)); // Ограничим максимум 100
+        
+        var result = await _repository.GetFilteredPagesAsync(title, from, to, page, pageSize, cancellationToken);
 
-        // Получаем все события
-        var query = _context.Events.AsQueryable();
-
-        // Применяем фильтры
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            query = query.Where(e => e.Title.Contains(title, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (from.HasValue)
-        {
-            query = query.Where(e => e.StartAt >= from.Value);
-        }
-
-        if (to.HasValue)
-        {
-            query = query.Where(e => e.EndAt <= to.Value);
-        }
-
-        // Подсчитываем общее количество
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        // Пагинация
-        var items = query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToDtoList();
-
-        // Формируем результат
         return new PaginatedResult<EventDtoResponse>
         {
-            TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize,
-            Items = items
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize,
+            Items = result.Items.ToDtoList() // Маппинг в DTO
         };
     }
 
     /// <inheritdoc />
     public async Task<EventDtoResponse> GetEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var eventEntity = await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken)
-            ?? throw new NotFoundException($"Событие с ID {id} не найдено.");
+        var eventEntity = await _repository.GetByIdAsync(id, cancellationToken) 
+                    ?? throw new NotFoundException($"Событие с ID {id} не найдено.");
         return eventEntity.ToDtoResponse();
     }
 
@@ -99,8 +73,8 @@ public sealed class EventService : IEventService
             description: evtDto.Description
         );
 
-        await _context.Events.AddAsync(eventEntity, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        await _repository.AddAsync(eventEntity, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         return eventEntity.ToDtoResponse();
     }
@@ -111,11 +85,11 @@ public sealed class EventService : IEventService
         // Дополнительная защита: на случай, если метод вызван без валидации модели
         ArgumentNullException.ThrowIfNull(evtDto, nameof(evtDto));
 
-        var eventEntity = await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken)
-            ?? throw new NotFoundException($"Событие с ID {id} не найдено.");
+        var eventEntity = await _repository.GetByIdAsync(id, cancellationToken)
+                    ?? throw new NotFoundException($"Событие с ID {id} не найдено."); ;
 
         eventEntity.Update(evtDto.Title, evtDto.StartAt, evtDto.EndAt, evtDto.Description);
-        await _context.SaveChangesAsync(cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         return eventEntity.ToDtoResponse();
     }
@@ -123,12 +97,12 @@ public sealed class EventService : IEventService
     /// <inheritdoc />
     public async Task<bool> RemoveEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var eventEntity = await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
-        if (eventEntity == null)
-            throw new NotFoundException($"Событие с ID {id} не найдено.");
-        _context.Events.Remove(eventEntity);
+        var eventEntity = await _repository.GetByIdAsync(id, cancellationToken)
+                    ?? throw new NotFoundException($"Событие с ID {id} не найдено."); ;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await _repository.DeleteAsync(eventEntity, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+
         return true;
     }
 }
