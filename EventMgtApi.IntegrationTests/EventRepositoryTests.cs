@@ -1,23 +1,20 @@
-﻿using Docker.DotNet.Models;
-using EventMgtApi.Domain.Entities;
+﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Infrastructure.DataAccess;
 using EventMgtApi.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using Testcontainers.PostgreSql;
 
 namespace EventMgtApi.IntegrationTests;
 
-public class EventRepositoryTests : IAsyncLifetime
+[Collection("Database")]
+public class EventRepositoryTests
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
-        .WithDatabase("eventapi")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
-        .Build();
+    private readonly PostgreSqlContainer _postgres;
 
-    public async Task InitializeAsync() => await _postgres.StartAsync();
-    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+    public EventRepositoryTests(PostgreSqlContainerFixture fixture)
+    {
+        _postgres = fixture.PostgreSql;
+    }
 
     private AppDbContext CreateContext()
     {
@@ -25,9 +22,7 @@ public class EventRepositoryTests : IAsyncLifetime
             .UseNpgsql(_postgres.GetConnectionString())
             .Options;
 
-        var context = new AppDbContext(options);
-        context.Database.EnsureCreated();
-        return context;
+        return new AppDbContext(options);
     }
 
     private async Task ResetDatabaseAsync() 

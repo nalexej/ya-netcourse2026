@@ -1,29 +1,21 @@
-﻿using EventMgtApi.Application.Services;
-using EventMgtApi.Domain.Entities;
+﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
-using EventMgtApi.Domain.Exceptions;
-using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.DataAccess;
 using EventMgtApi.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using Testcontainers.PostgreSql;
-using FluentAssertions;
 
 namespace EventMgtApi.IntegrationTests;
 
-public class BookingRepositoryTests : IAsyncLifetime
+[Collection("Database")]
+public class BookingRepositoryTests 
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
-        .WithDatabase("eventapi")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
-        .Build();
+    private readonly PostgreSqlContainer _postgres;
 
-    public async Task InitializeAsync() => await _postgres.StartAsync();
-    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+    public BookingRepositoryTests(PostgreSqlContainerFixture fixture)
+    {
+        _postgres = fixture.PostgreSql;
+    }
 
     private AppDbContext CreateContext()
     {
@@ -31,9 +23,7 @@ public class BookingRepositoryTests : IAsyncLifetime
             .UseNpgsql(_postgres.GetConnectionString())
             .Options;
 
-        var context = new AppDbContext(options);
-        context.Database.EnsureCreated();
-        return context;
+        return new AppDbContext(options);
     }
 
     private async Task ResetDatabaseAsync()
@@ -91,6 +81,50 @@ public class BookingRepositoryTests : IAsyncLifetime
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => repo.AddAsync(null!, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ReturnsBooking_ById()
+    {
+        // Arrange
+        await ResetDatabaseAsync();
+        var context = CreateContext();
+        var repo = new BookingRepository(context);
+
+        var @event = CreateTestEvent(context);
+        var booking = new Booking(@event.Id);
+        await repo.AddAsync(booking, CancellationToken.None);
+        await repo.SaveChangesAsync();
+
+        // Act — получаем через новый контекст
+        await using var verifyCtx = CreateContext();
+        var verifyRepo = new BookingRepository(verifyCtx);
+        var result = await verifyRepo.GetByIdAsync(booking.Id);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(booking.Id, result!.Id);
+        Assert.Equal(@event.Id, result.EventId);
+        Assert.Equal(BookingStatus.Pending, result.Status);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ReturnsNull_ForNonExistentId()
+    {
+        // Arrange
+        await ResetDatabaseAsync();
+        var context = CreateContext();
+        var repo = new BookingRepository(context);
+
+        var nonExistentId = Guid.NewGuid();
+
+        // Act
+        await using var verifyCtx = CreateContext();
+        var verifyRepo = new BookingRepository(verifyCtx);
+        var result = await verifyRepo.GetByIdAsync(nonExistentId);
+
+        // Assert
+        Assert.Null(result);
     }
 
     [Fact]

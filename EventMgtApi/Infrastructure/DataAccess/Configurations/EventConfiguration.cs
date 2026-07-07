@@ -63,7 +63,8 @@ namespace EventMgtApi.Infrastructure.DataAccess.Configurations
             builder.HasMany(e => e.Bookings)
                 .WithOne(b => b.Event)
                 .HasForeignKey(b => b.EventId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_bookings_events_event_id");
         }
     }
 }

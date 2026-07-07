@@ -7,23 +7,21 @@ using EventMgtApi.Infrastructure.DataAccess;
 using EventMgtApi.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using Testcontainers.PostgreSql;
 using FluentAssertions;
 
 namespace EventMgtApi.IntegrationTests;
 
-public class ConcurrentTests : IAsyncLifetime
+[Collection("Database")]
+public class ConcurrentTests
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
-        .WithDatabase("eventapi")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
-        .Build();
+    private readonly PostgreSqlContainer _postgres;
 
-    public async Task InitializeAsync() => await _postgres.StartAsync();
-    public async Task DisposeAsync() => await _postgres.DisposeAsync();
+    public ConcurrentTests(PostgreSqlContainerFixture fixture)
+    {
+        _postgres = fixture.PostgreSql;
+    }
 
     private AppDbContext CreateContext()
     {
@@ -31,9 +29,7 @@ public class ConcurrentTests : IAsyncLifetime
             .UseNpgsql(_postgres.GetConnectionString())
             .Options;
 
-        var context = new AppDbContext(options);
-        context.Database.EnsureCreated();
-        return context;
+        return new AppDbContext(options);
     }
 
     private async Task ResetDatabaseAsync()
@@ -173,6 +169,8 @@ public class ConcurrentTests : IAsyncLifetime
     [Fact]
     public async Task CreateBookingAsync_ConcurrentRequests_DoesNotOverbookEvent()
     {
+        await ResetDatabaseAsync();
+
         const int totalSeats = 5;
         const int concurrentRequests = 20;
         var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
@@ -202,6 +200,9 @@ public class ConcurrentTests : IAsyncLifetime
     [Fact]
     public async Task CreateBookingAsync_ConcurrentRequests_AllSuccessfulBookingsHaveUniqueIds()
     {
+
+        await ResetDatabaseAsync();
+
         const int totalSeats = 10;
         const int concurrentRequests = 10;
         var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
