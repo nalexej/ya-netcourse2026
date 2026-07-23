@@ -1,9 +1,9 @@
 ﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using EventMgtApi.Domain.Interfaces;
-using EventMgtApi.Infrastructure.DataAccess;
-using EventMgtApi.Infrastructure.Repositories;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace EventMgtApi.Infrastructure.BackgroundServices;
 
