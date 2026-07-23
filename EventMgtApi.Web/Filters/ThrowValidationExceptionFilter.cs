@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using EventMgtApi.Domain.Exceptions;
 
-namespace EventMgtApi.Presentation.Filters;
+namespace EventMgtApi.Web.Filters;
 
 /// <summary>
 /// Фильтр действий, который проверяет состояние модели (<see cref="ModelStateDictionary"/>).

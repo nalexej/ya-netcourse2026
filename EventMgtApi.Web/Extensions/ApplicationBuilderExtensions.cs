@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
-using EventMgtApi.Presentation.Middleware;
+using EventMgtApi.Web.Middleware;
 
-namespace EventMgtApi.Presentation.Extensions;
+namespace EventMgtApi.Web.Extensions;
 
 /// <summary>
 /// Методы расширения для <see cref="IApplicationBuilder"/>.

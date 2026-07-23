@@ -4,7 +4,7 @@ using EventMgtApi.Domain.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
-namespace EventMgtApi.Presentation.Controllers;
+namespace EventMgtApi.Web.Controllers;
 
 /// <summary>
 /// Контроллер для управления событиями через HTTP API.

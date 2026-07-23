@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using EventMgtApi.Domain.Exceptions;
 
-namespace EventMgtApi.Presentation.Middleware;
+namespace EventMgtApi.Web.Middleware;
 
 /// <summary>
 /// Middleware для глобальной обработки исключений.

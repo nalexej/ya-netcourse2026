@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
 
-namespace EventMgtApi.Presentation.Controllers;
+namespace EventMgtApi.Web.Controllers;
 
 /// <summary>
 /// Контроллер для управления бронированиями.
