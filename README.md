@@ -63,7 +63,6 @@ API предоставляет полный цикл операций **CRUD**:
 
 ---
 
-
 ## 🛠 Технологии
 
 - **.NET 10** / **C# 12**
@@ -130,6 +129,7 @@ dotnet ef migrations add <Название_миграции>
 dotnet ef database update
 ```
 
+---
 
 ### Сборка и запуск
 В корне репозитория выполните:
@@ -137,7 +137,7 @@ dotnet ef database update
 ```bash
 dotnet restore
 dotnet build
-dotnet run --project EventMgtApi/EventMgtApi.csproj --urls "https://localhost:7001"
+dotnet run --project EventMgtApi.Web/EventMgtApi.Web.csproj --urls "https://localhost:7001"
 ```
 
 🔐 API работает по HTTPS на порту 7001.
@@ -457,8 +457,8 @@ POST /api/events/event-id/book
 Структура папок отражает слои приложения, что упрощает масштабирование, тестирование и поддержку.
 
 ```
-EventMgtApi/
-├── Domain/                       # Бизнес-ядро: сущности, интерфейсы, исключения
+EventMgtService.sln
+├── EventMgtApi.Domain/           # Бизнес-ядро: сущности, интерфейсы, исключения
 │   ├── Entities/
 │   │   ├── Event.cs             # Модель события (с TotalSeats, AvailableSeats)
 │   │   └── Booking.cs           # Модель бронирования
@@ -472,35 +472,45 @@ EventMgtApi/
 │       ├── IEventRepository.cs  # Абстракция доступа к событиям
 │       └── IBookingRepository.cs # Абстракция доступа к броням
 │
-├── Application/                  # Логика приложения: сервисы, DTO, маппинг
-│   ├── Services/
-│   │   ├── IEventService.cs     # Интерфейс управления событиями
+├── EventMgtApi.Application/      # Логика приложения: сервисы, DTO, маппинг
+│   ├── Abstractions/
+│   │   ├── Persistence/
+│   │   │   ├── IEventRepository.cs  # Абстракция доступа к событиям
+│   │   │   └── IBookingRepository.cs # Абстракция доступа к броням
+│   │   └── Services/
+│   │       ├── IEventService.cs     # Интерфейс управления событиями
+│   │       └── IBookingService.cs   # Интерфейс управления бронями
+│   ├── Events/
 │   │   ├── EventService.cs      # Реализация бизнес-логики событий
-│   │   ├── IBookingService.cs   # Интерфейс управления бронями
-│   │   └── BookingService.cs    # Логика создания и получения броней (с SemaphoreSlim)
-│   ├── DTOs/
-│   │   ├── EventDto.cs          # DTO для создания/обновления события
-│   │   ├── EventDtoResponse.cs  # DTO ответа с Id
-│   │   ├── BookingResponseDto.cs # DTO статуса брони
-│   │   ├── CreateBookingRequestDto.cs # Пустой DTO для бронирования
-│   │   └── PaginatedResult.cs   # Обобщённый ответ с пагинацией
+│   │   ├── DTOs/
+│   │   │   ├── EventDto.cs          # DTO для создания/обновления события
+│   │   │   ├── EventDtoResponse.cs  # DTO ответа с Id
+│   │   │   └── PaginatedResult.cs   # Обобщённый ответ с пагинацией
+│   │   └── Extensions/
+│   │       └── EventMappingExtensions.cs # Методы ToDtoResponse(), ToDtoList()
+│   ├── Bookings/
+│   │   ├── BookingService.cs    # Логика создания и получения броней (с SemaphoreSlim)
+│   │   ├── DTOs/
+│   │   │   ├── BookingResponseDto.cs # DTO статуса брони
+│   │   │   └── CreateBookingRequestDto.cs # Пустой DTO для бронирования
+│   │   └── Extensions/
+│   │       └── BookingsMappingExtensions.cs # Метод ToDtoResponse()
 │   └── Extensions/
-│       ├── BookingsMappingExtensions.cs # Метод ToDtoResponse()
-│       └── EventMappingExtensions.cs # Методы ToDtoResponse(), ToDtoList()
 │
-├── Infrastructure/               # Внешние реализации
-│   ├── Repositories/
-│   │   └── BookingRepository/ # Репозиторий для доступа к данным бронирований
-│   │   └── EventRepository/ # Репозиторий для доступа к данным событий
-│   ├── DataAccess/
-│   │   └── Configurations/ # Конфигурации объектов в базе данных
-│   │   	└── BookingConfiguration.cs # Бронирования
-│   │   	└── EventConfiguration.cs # События
-│   │   └── AppDbContext.cs # Контекст базы данных
-│   └── BackgroundServices/
+├── EventMgtApi.Infrastructure/   # Внешние реализации
+│   ├── Persistence/
+│   │   ├── AppDbContext.cs      # Контекст базы данных
+│   │   ├── Configurations/      # Конфигурации объектов в базе данных
+│   │   │   ├── BookingConfiguration.cs # Бронирования
+│   │   │   └── EventConfiguration.cs # События
+│   │   ├── Migrations/          # Миграции EF Core
+│   │   └── Repositories/
+│   │       ├── EventRepository.cs  # Реализация репозитория для событий
+│   │       └── BookingRepository.cs # Реализация репозитория для броней
+│   └── Services/
 │       └── BookingProcessingBackgroundService.cs # Обработка Pending → Confirmed (с SemaphoreSlim)
 │
-├── Presentation/                 # Входная точка API
+├── EventMgtApi.Web/              # Входная точка API (Presentation Layer)
 │   ├── Controllers/
 │   │   ├── EventsController.cs  # Обработка /api/events
 │   │   └── BookingsController.cs # Обработка /api/bookings
@@ -509,13 +519,30 @@ EventMgtApi/
 │   ├── Filters/
 │   │   └── ThrowValidationExceptionFilter.cs # Преобразует ModelState в исключение
 │   └── Extensions/
-│       └── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
+│       ├── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
+│       └── ServiceCollectionExtensions.cs # Методы регистрации сервисов
 │
-├── Migrations/               # Миграции
+├── EventMgtApi.UnitTests/        # Юнит-тесты
+│   ├── EventServiceTests.cs
+│   ├── BookingServiceTests.cs
+│   ├── EventTests.cs
+│   ├── BookingTests.cs
+│   └── TestDataFactory.cs
 │
-├── Program.cs                # Настройка DI, слоёв, маршрутов, Swagger
-└── Properties/
-└── launchSettings.json       # Конфигурация запуска (HTTPS, порт 7001)
+├── EventMgtApi.IntegrationTests/ # Интеграционные тесты
+│   ├── DatabaseFixture.cs
+│   ├── EventRepositoryTests.cs
+│   ├── BookingRepositoryTests.cs
+│   ├── CommonTests.cs
+│   └── ConcurrentTests.cs
+│
+├── EventMgtApi/                  # Основной проект (стартовый)
+│   ├── Program.cs                # Настройка DI, слоёв, маршрутов, Swagger
+│   ├── appsettings.json          # Конфигурация
+│   └── Properties/
+│       └── launchSettings.json   # Конфигурация запуска (HTTPS, порт 7001)
+│
+└── docker-compose.yml            # Конфигурация Docker Compose
 ```
 
 ---
@@ -556,7 +583,7 @@ EventMgtApi/
 Запуск unit-тестов (в корне репозитория):
 
 ```bash
-dotnet test EventMgtApi.Tests/EventMgtApiTests.csproj
+dotnet test EventMgtApi.UnitTests/EventMgtApi.UnitTests.csproj
 ```
 
 ### Интеграционные тесты
