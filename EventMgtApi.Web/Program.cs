@@ -1,7 +1,7 @@
 using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.BackgroundServices;
-using EventMgtApi.Infrastructure.DataAccess;
+using EventMgtApi.Infrastructure.Persistence;
 using EventMgtApi.Infrastructure.Repositories;
 using EventMgtApi.Web.Extensions;
 using EventMgtApi.Web.Filters;

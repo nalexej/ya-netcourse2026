@@ -1,4 +1,4 @@
-﻿using EventMgtApi.Infrastructure.DataAccess;
+﻿using EventMgtApi.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 

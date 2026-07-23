@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace EventMgtApi.Infrastructure.DataAccess.Configurations
+namespace EventMgtApi.Infrastructure.Persistence.Configurations
 {
     /// <summary>
     /// Конфигурация сущности <see cref="Booking"/> для ORM.

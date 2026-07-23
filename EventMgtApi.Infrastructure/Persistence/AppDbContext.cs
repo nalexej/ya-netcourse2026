@@ -1,7 +1,7 @@
 ﻿using EventMgtApi.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace EventMgtApi.Infrastructure.DataAccess
+namespace EventMgtApi.Infrastructure.Persistence
 {
     /// <summary>
     /// Контекст базы данных для системы управления событиями.
