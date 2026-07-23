@@ -3,8 +3,6 @@ using EventMgtApi.Application.Extensions;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
 using EventMgtApi.Domain.Interfaces;
-using EventMgtApi.Infrastructure.DataAccess;
-using Microsoft.EntityFrameworkCore;
 
 namespace EventMgtApi.Application.Services;
 
