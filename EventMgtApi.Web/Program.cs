@@ -1,13 +1,12 @@
-using EventMgtApi.Application.Services;
-using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.BackgroundServices;
 using EventMgtApi.Infrastructure.Persistence;
-using EventMgtApi.Infrastructure.Repositories;
 using EventMgtApi.Web.Extensions;
 using EventMgtApi.Web.Filters;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
+using EventMgtApi.Application.DependencyInjection;
+using EventMgtApi.Infrastructure.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,17 +25,9 @@ builder.Services.AddControllers(options =>
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-builder.Services.AddScoped<IEventService, EventService>();
-builder.Services.AddScoped<IBookingService, BookingService>();
-
-builder.Services.AddScoped<IEventRepository, EventRepository>();
-builder.Services.AddScoped<IBookingRepository, BookingRepository>();
-
-
-// Регистрация фонового сервиса
-builder.Services.AddHostedService<BookingProcessingBackgroundService>();
+// Регистрация слоев через расширения
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();

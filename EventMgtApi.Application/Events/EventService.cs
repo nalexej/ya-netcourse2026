@@ -1,8 +1,8 @@
 ﻿using EventMgtApi.Application.DTOs;
 using EventMgtApi.Application.Extensions;
+using EventMgtApi.Application.Interfaces;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
-using EventMgtApi.Domain.Interfaces;
 
 namespace EventMgtApi.Application.Services;
 

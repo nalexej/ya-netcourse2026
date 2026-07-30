@@ -1,7 +1,7 @@
 ﻿using EventMgtApi.Application.DTOs;
 using EventMgtApi.Domain.Entities;
 
-namespace EventMgtApi.Domain.Interfaces
+namespace EventMgtApi.Application.Interfaces
 {
     /// <summary>
     /// Интерфейс для доступа к данным событий.

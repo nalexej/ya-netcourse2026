@@ -1,8 +1,8 @@
 ﻿using EventMgtApi.Application.DTOs;
+using EventMgtApi.Application.Interfaces;
 using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
-using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

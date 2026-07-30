@@ -1,6 +1,4 @@
-﻿using System;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
-
+﻿
 namespace EventMgtApi.Domain.Exceptions
 {
     /// <summary>
@@ -9,11 +7,12 @@ namespace EventMgtApi.Domain.Exceptions
     /// </summary>
     public class ValidationException : Exception
     {
-        /// <summary>
-        /// Получает словарь состояния модели, содержащий ошибки валидации.
-        /// Доступен, если исключение было вызвано проверкой <see cref="ModelStateDictionary"/>.
-        /// </summary>
-        public ModelStateDictionary ModelState { get; } = null!;
+        ///// <summary>
+        ///// Получает словарь состояния модели, содержащий ошибки валидации.
+        ///// Доступен, если исключение было вызвано проверкой <see cref="ModelStateDictionary"/>.
+        ///// </summary>
+        //public ModelStateDictionary ModelState { get; } = null!;
+
 
         /// <summary>
         /// Коллекция ошибок валидации (для валидации в обход ModelState)
@@ -57,19 +56,19 @@ namespace EventMgtApi.Domain.Exceptions
         {
         }
 
-        /// <summary>
-        /// Инициализирует новый экземпляр класса <see cref="ValidationException"/> 
-        /// на основе <see cref="ModelStateDictionary"/> с деталями валидации.
-        /// </summary>
-        /// <param name="modelState">
-        /// Словарь состояния модели, содержащий ошибки валидации. 
-        /// Не должен быть <see langword="null"/>.
-        /// </param>
-        /// <exception cref="ArgumentNullException">Выбрасывается, если <paramref name="modelState"/> равен <see langword="null"/>.</exception>
-        public ValidationException(ModelStateDictionary modelState)
-            : base("Обнаружены ошибки валидации входных данных.")
-        {
-            ModelState = modelState ?? throw new ArgumentNullException(nameof(modelState));
-        }
+        ///// <summary>
+        ///// Инициализирует новый экземпляр класса <see cref="ValidationException"/> 
+        ///// на основе <see cref="ModelStateDictionary"/> с деталями валидации.
+        ///// </summary>
+        ///// <param name="modelState">
+        ///// Словарь состояния модели, содержащий ошибки валидации. 
+        ///// Не должен быть <see langword="null"/>.
+        ///// </param>
+        ///// <exception cref="ArgumentNullException">Выбрасывается, если <paramref name="modelState"/> равен <see langword="null"/>.</exception>
+        //public ValidationException(ModelStateDictionary modelState)
+        //    : base("Обнаружены ошибки валидации входных данных.")
+        //{
+        //    ModelState = modelState ?? throw new ArgumentNullException(nameof(modelState));
+        //}
     }
 }

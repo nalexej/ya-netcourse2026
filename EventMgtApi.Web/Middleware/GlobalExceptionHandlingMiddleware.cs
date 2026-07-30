@@ -74,28 +74,22 @@ public class GlobalExceptionHandlingMiddleware
     /// Обрабатывает <see cref="ValidationException"/>, формируя ответ с деталями валидации.
     /// </summary>
     /// <param name="context">Контекст HTTP-запроса.</param>
-    /// <param name="ex">Исключение с <see cref="ModelStateDictionary"/>.</param>
+    /// <param name="ex">Исключение с деталями валидации.</param>
     private async Task HandleValidationExceptionAsync(HttpContext context, ValidationException ex)
     {
         // Логируем детали валидации
-        var errorMessages = ex switch
-        {
-            _ when ex?.ModelState != null
-                => string.Join("; ", ex.ModelState
-            .Where(kv => kv.Value?.Errors.Count > 0)
-            .SelectMany(kv => kv.Value!.Errors.Select(e => $"{kv.Key}: {e.ErrorMessage}"))),
-
-            _ =>  string.Join("; ", ex!.Errors
-            .Where(kv => kv.Value != null)
-            .SelectMany(kv => kv.Value.Select(v => $"{kv.Key}: {v}"))),
-        };
+        // Используем только Errors, так как ModelState удален
+        var errorMessages = ex.Errors
+            .Where(kv => kv.Value != null && kv.Value.Any())
+            .SelectMany(kv => kv.Value!.Select(v => $"{kv.Key}: {v}"))
+            .ToList();
 
         _logger.LogError(
             "Ошибка валидации. Method={Method}, Path={Path}, Errors={Errors}, RequestId={RequestId}",
             context.Request.Method,
             context.Request.Path,
-            errorMessages,
-            context.Request.Headers["x-request-id"].ToString()); // закладка на будущее
+            string.Join("; ", errorMessages),
+            context.Request.Headers["x-request-id"].ToString());
 
         var details = new ProblemDetails
         {
@@ -105,30 +99,13 @@ public class GlobalExceptionHandlingMiddleware
             Instance = context.Request.Path,
         };
 
-        var errors = ex switch
-        {
-            _ when ex?.ModelState != null
-                  =>
-                ex.ModelState
-                    .Where(kv => kv.Value?.Errors.Count > 0)
-                    .ToDictionary(
-                        kv => kv.Key,
-                        kv => kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
-                    ),
-
-
-            _ when ex?.Errors != null
-                  =>
-                ex?.Errors
-                .Where(kv => kv.Value != null)
-                .ToDictionary(
-                    kv => kv.Key,
-                    kv => kv.Value.Select(e => e.ToString()).ToArray()
-                ),
-            _
-              => new Dictionary<string, string[]>()
-        };
-
+        // Формируем словарь ошибок для ProblemDetails
+        var errors = ex.Errors
+            .Where(kv => kv.Value != null)
+            .ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.Select(e => e.ToString()).ToArray()
+            );
 
         details.Extensions["errors"] = errors;
 

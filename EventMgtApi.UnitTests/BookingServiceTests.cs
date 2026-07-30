@@ -1,8 +1,8 @@
-﻿using EventMgtApi.Application.Services;
+﻿using EventMgtApi.Application.Interfaces;
+using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using EventMgtApi.Domain.Exceptions;
-using EventMgtApi.Domain.Interfaces;
 using FluentAssertions;
 using Moq;
 

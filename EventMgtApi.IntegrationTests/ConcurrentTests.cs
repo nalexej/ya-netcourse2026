@@ -1,8 +1,6 @@
 ﻿using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Entities;
-using EventMgtApi.Domain.Enums;
 using EventMgtApi.Domain.Exceptions;
-using EventMgtApi.Domain.Interfaces;
 using EventMgtApi.Infrastructure.Persistence;
 using EventMgtApi.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 using Testcontainers.PostgreSql;
 using FluentAssertions;
+using EventMgtApi.Application.Interfaces;
 
 namespace EventMgtApi.IntegrationTests;
 

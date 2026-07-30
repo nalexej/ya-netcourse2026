@@ -465,18 +465,16 @@ EventMgtService.sln
 │   ├── Enums/
 │   │   └── BookingStatus.cs     # Статусы брони: Pending, Confirmed, Rejected
 │   ├── Exceptions/
-│   │   ├── NotFoundException.cs # Ошибка "не найдено" (404)
-│   │   ├── ValidationException.cs # Ошибка валидации (400)
-│   │   └── NoAvailableSeatsException.cs # Ошибка овербукинга (409)
-│   └── Interfaces/
-│       ├── IEventRepository.cs  # Абстракция доступа к событиям
-│       └── IBookingRepository.cs # Абстракция доступа к броням
+│       ├── NotFoundException.cs # Ошибка "не найдено" (404)
+│       ├── ValidationException.cs # Ошибка валидации (400)
+│       └── NoAvailableSeatsException.cs # Ошибка овербукинга (409)
 │
 ├── EventMgtApi.Application/      # Логика приложения: сервисы, DTO, маппинг
 │   ├── Abstractions/
 │   │   ├── Persistence/
-│   │   │   ├── IEventRepository.cs  # Абстракция доступа к событиям
-│   │   │   └── IBookingRepository.cs # Абстракция доступа к броням
+│   │   │   ├── Repositories/
+│   │   │       ├── IEventRepository.cs  # Абстракция доступа к событиям
+│   │   │       └── IBookingRepository.cs # Абстракция доступа к броням
 │   │   └── Services/
 │   │       ├── IEventService.cs     # Интерфейс управления событиями
 │   │       └── IBookingService.cs   # Интерфейс управления бронями
@@ -495,7 +493,8 @@ EventMgtService.sln
 │   │   │   └── CreateBookingRequestDto.cs # Пустой DTO для бронирования
 │   │   └── Extensions/
 │   │       └── BookingsMappingExtensions.cs # Метод ToDtoResponse()
-│   └── Extensions/
+│   └── DependencyInjection/
+│       ├── ApplicationServiceCollectionExtensions.cs    # Регистрация сервисов уровня приложения
 │
 ├── EventMgtApi.Infrastructure/   # Внешние реализации
 │   ├── Persistence/
@@ -508,7 +507,9 @@ EventMgtService.sln
 │   │       ├── EventRepository.cs  # Реализация репозитория для событий
 │   │       └── BookingRepository.cs # Реализация репозитория для броней
 │   └── Services/
-│       └── BookingProcessingBackgroundService.cs # Обработка Pending → Confirmed (с SemaphoreSlim)
+│   │   └── BookingProcessingBackgroundService.cs # Обработка Pending → Confirmed (с SemaphoreSlim)
+│   └── DependencyInjection/
+│       ├── InfrastructureServiceCollectionExtensions.cs    # Регистрация сервисов уровня инфраструктуры
 │
 ├── EventMgtApi.Web/              # Входная точка API (Presentation Layer)
 │   ├── Controllers/
@@ -519,8 +520,10 @@ EventMgtService.sln
 │   ├── Filters/
 │   │   └── ThrowValidationExceptionFilter.cs # Преобразует ModelState в исключение
 │   └── Extensions/
-│       ├── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
-│       └── ServiceCollectionExtensions.cs # Методы регистрации сервисов
+│   │    ├── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
+│   │    └── ServiceCollectionExtensions.cs # Методы регистрации сервисов
+│   │
+│   ├── Program.cs                # Настройка DI, слоёв, маршрутов, Swagger
 │
 ├── EventMgtApi.UnitTests/        # Юнит-тесты
 │   ├── EventServiceTests.cs
@@ -536,12 +539,6 @@ EventMgtService.sln
 │   ├── CommonTests.cs
 │   └── ConcurrentTests.cs
 │
-├── EventMgtApi/                  # Основной проект (стартовый)
-│   ├── Program.cs                # Настройка DI, слоёв, маршрутов, Swagger
-│   ├── appsettings.json          # Конфигурация
-│   └── Properties/
-│       └── launchSettings.json   # Конфигурация запуска (HTTPS, порт 7001)
-│
 └── docker-compose.yml            # Конфигурация Docker Compose
 ```
 
@@ -552,7 +549,7 @@ EventMgtService.sln
 - **Domain** — не зависит ни от чего. Содержит только бизнес-сущности и контракты.
 - **Application** — зависит от `Domain`. Содержит логику, DTO и сервисы.
 - **Infrastructure** — зависит от `Domain` и `Application`. Реализует абстракции (например, репозитории).
-- **Presentation** — зависит от `Application` и `Domain`. Отвечает за HTTP, контроллеры, middleware.
+- **Presentation** — зависит от `Application`, `Domain` и `Infrastructure`. Отвечает за HTTP, контроллеры, middleware.
 
 > 💡 Такая структура позволяет:
 > - Легко заменить in-memory хранилище на EF Core или Redis.

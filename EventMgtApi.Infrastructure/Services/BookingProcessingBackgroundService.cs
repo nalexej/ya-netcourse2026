@@ -1,6 +1,6 @@
-﻿using EventMgtApi.Domain.Entities;
+﻿using EventMgtApi.Application.Interfaces;
+using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
-using EventMgtApi.Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

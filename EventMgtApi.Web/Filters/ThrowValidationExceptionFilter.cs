@@ -24,7 +24,20 @@ public class ThrowValidationExceptionFilter : IActionFilter, IOrderedFilter
     {
         if (!context.ModelState.IsValid)
         {
-            throw new ValidationException(context.ModelState);
+            // Создаем словарь с явным указанием типов ключа и значения (ICollection<string>)
+            var errors = new Dictionary<string, ICollection<string>>();
+
+            foreach (var kvp in context.ModelState)
+            {
+                // Проверяем, что Value не null и есть ошибки
+                if (kvp.Value?.Errors.Count > 0)
+                {
+                    // Преобразуем Errors в List (который реализует ICollection)
+                    errors.Add(kvp.Key, kvp.Value.Errors.Select(e => e.ErrorMessage).ToList());
+                }
+            }
+
+            throw new ValidationException(errors);
         }
     }
 
