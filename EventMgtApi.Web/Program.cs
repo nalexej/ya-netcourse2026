@@ -1,0 +1,65 @@
+using EventMgtApi.Infrastructure.BackgroundServices;
+using EventMgtApi.Infrastructure.Persistence;
+using EventMgtApi.Web.Extensions;
+using EventMgtApi.Web.Filters;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Reflection;
+using EventMgtApi.Application.DependencyInjection;
+using EventMgtApi.Infrastructure.DependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.SuppressModelStateInvalidFilter = true; // валидируем сами
+});
+
+// Регистрация контроллеров
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ThrowValidationExceptionFilter>();
+})
+.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
+
+// Регистрация слоев через расширения
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+// Регистрация Swagger для документации API
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    // Путь к XML-файлу с документацией
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    options.IncludeXmlComments(xmlPath);
+});
+
+var app = builder.Build();
+
+// Создания объектов БД
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
+// Настройка конвейера обработки запросов
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseGlobalExceptionHandling();
+
+app.UseHttpsRedirection();
+
+// Подключение маршрутизации контроллеров
+app.MapControllers();
+
+app.Run();
