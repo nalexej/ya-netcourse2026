@@ -16,7 +16,7 @@ namespace EventMgtApi.Application.DependencyInjection
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<IUserService, UserService>();
 
-            services.Configure<BookingOptions>(options => configuration.GetSection("BookingSettings").Bind(options));
+            services.Configure<BookingOptions>(options => configuration.GetSection("BookingOptions").Bind(options));
 
             return services;
         }

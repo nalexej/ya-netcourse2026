@@ -1,0 +1,62 @@
+using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Application.Users.DTOs;
+using EventMgtApi.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace EventMgtApi.Web.Controllers;
+
+/// <summary>
+/// Контроллер для аутентификации и регистрации пользователей.
+/// </summary>
+[Authorize]
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
+{
+    private readonly IUserService _userService;
+
+    /// <summary>
+    /// Конструктор.
+    /// </summary>
+    /// <param name="userService">Сервис аутентификации и регистрации пользователей</param>
+    public AuthController(IUserService userService)
+    {
+        _userService = userService;
+    }
+
+    /// <summary>
+    /// Регистрация нового пользователя.
+    /// </summary>
+    /// <param name="request">Данные регистрации (login, password, optional role).</param>
+    /// <returns>Код 204.</returns>
+    [AllowAnonymous]
+    [HttpPost("register")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
+    {
+        if (request == null)
+            return BadRequest("Тело запроса не может быть null.");
+
+        var result = await _userService.RegisterAsync(request);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Вход пользователя в систему.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("login")]
+    [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto request)
+    {
+        if (request == null)
+            return BadRequest("Тело запроса не может быть null.");
+
+        var result = await _userService.LoginAsync(request);
+        return Ok(result);
+    }
+}
