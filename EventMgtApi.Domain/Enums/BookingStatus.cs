@@ -1,4 +1,4 @@
-﻿namespace EventMgtApi.Domain.Enums;
+namespace EventMgtApi.Domain.Enums;
 
 /// <summary>
 /// Статус бронирования места на событии.
@@ -18,5 +18,10 @@ public enum BookingStatus
     /// <summary>
     /// Бронь отклонена.
     /// </summary>
-    Rejected
+    Rejected,
+
+    /// <summary>
+    /// Бронь отменена.
+    /// </summary>
+    Cancelled
 }

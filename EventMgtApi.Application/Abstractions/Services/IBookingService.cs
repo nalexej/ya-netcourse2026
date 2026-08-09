@@ -1,10 +1,9 @@
-﻿using EventMgtApi.Application.DTOs;
-using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Application.DTOs;
 using EventMgtApi.Domain.Enums;
 using System;
 using System.Threading.Tasks;
 
-namespace EventMgtApi.Application.Services;
+namespace EventMgtApi.Application.Abstractions.Services;
 
 /// <summary>
 /// Интерфейс сервиса для управления бронированиями.
@@ -16,9 +15,10 @@ public interface IBookingService
     /// Статус брони устанавливается в <see cref="BookingStatus.Pending"/>.
     /// </summary>
     /// <param name="eventId">Идентификатор события, для которого создаётся бронь.</param>
+    /// <param name="userId">Идентификатор пользователя, создающего бронь.</param>
     /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>DTO созданной брони.</returns>
-    Task<BookingResponseDto> CreateBookingAsync(Guid eventId, CancellationToken cancellationToken = default);
+    Task<BookingResponseDto> CreateBookingAsync(Guid eventId, Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Асинхронно получает бронь по идентификатору.
@@ -26,6 +26,17 @@ public interface IBookingService
     /// <param name="bookingId">Уникальный идентификатор брони.</param>
     /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>DTO найденной брони.</returns>
-    /// <exception cref="NotFoundException">Выбрасывается, если бронь с указанным ID не найдена.</exception>
+    /// <exception cref="Domain.Exceptions.NotFoundException">Выбрасывается, если бронь с указанным ID не найдена.</exception>
     Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Отменяет бронь по идентификатору.
+    /// </summary>
+    /// <param name="bookingId">Идентификатор брони.</param>
+    /// <param name="userId">Идентификатор текущего пользователя.</param>
+    /// <param name="isAdmin">Флаг, является ли пользователь администратором.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>DTO отменённой брони.</returns>
+    Task<BookingResponseDto> CancelBookingAsync(Guid bookingId, Guid userId, bool isAdmin, CancellationToken cancellationToken = default);
+
 }
