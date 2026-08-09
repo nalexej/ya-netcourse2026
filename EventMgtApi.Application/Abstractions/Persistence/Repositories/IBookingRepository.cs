@@ -47,6 +47,11 @@ public interface IBookingRepository
     Task<IEnumerable<Guid>> GetPendingBookingsIdsAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Асинхронно получает количество активных бронирований для указанного пользователя.
+    /// </summary>
+    Task<int> GetActiveBookingsCountAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Асинхронно добавляет новую бронь.
     /// </summary>
     /// <param name="booking">Бронь для добавления. Должна иметь валидный <see cref="Booking.Id"/>.</param>

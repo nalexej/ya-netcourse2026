@@ -1,4 +1,5 @@
-﻿using EventMgtApi.Application.DTOs;
+﻿using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Application.DTOs;
 using EventMgtApi.Application.Extensions;
 using EventMgtApi.Application.Interfaces;
 using EventMgtApi.Domain.Entities;

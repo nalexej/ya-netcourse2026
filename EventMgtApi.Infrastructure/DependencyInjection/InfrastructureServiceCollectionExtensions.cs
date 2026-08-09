@@ -18,6 +18,7 @@ namespace EventMgtApi.Infrastructure.DependencyInjection
             // Регистрация репозиториев
             services.AddScoped<IEventRepository, EventRepository>();
             services.AddScoped<IBookingRepository, BookingRepository>();
+            services.AddScoped<IUserRepository, UserRepository>();
 
             // Регистрация DbContext
             services.AddDbContext<AppDbContext>(options =>

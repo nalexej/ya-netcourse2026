@@ -71,6 +71,13 @@ namespace EventMgtApi.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
+        public async Task<int> GetActiveBookingsCountAsync(Guid userId, CancellationToken ct = default)
+        {
+            return await _context.Bookings
+                .CountAsync(b => b.UserId == userId && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed), ct);
+        }
+
+        /// <inheritdoc />
         public Task SaveChangesAsync(CancellationToken ct = default)
         {
             return _context.SaveChangesAsync(ct);
