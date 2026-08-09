@@ -1,14 +1,18 @@
-﻿using EventMgtApi.Application.Services;
+﻿using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Application.Interfaces;
+using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Entities;
+using EventMgtApi.Domain.Enums;
 using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Domain.Options;
 using EventMgtApi.Infrastructure.Persistence;
 using EventMgtApi.Infrastructure.Repositories;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using Testcontainers.PostgreSql;
-using FluentAssertions;
-using EventMgtApi.Application.Interfaces;
 
 namespace EventMgtApi.IntegrationTests;
 
@@ -47,6 +51,8 @@ public class ConcurrentTests
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
+        services.AddSingleton<IOptions<BookingOptions>>(
+            new OptionsWrapper<BookingOptions>(new BookingOptions { MaxActiveBookings = 10 }));
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider.CreateScope();
@@ -68,6 +74,15 @@ public class ConcurrentTests
         return @event.Id;
     }
 
+    private async Task<Guid> CreateTestUserAsync(UserRole userRole = UserRole.User)
+    {
+        await using var context = CreateContext();
+        var @user = User.Create("testuser_concurrent", "dummyhash", userRole);
+        context.Users.Add(@user);
+        await context.SaveChangesAsync();
+        return @user.Id;
+    }
+
     [Fact]
     public async Task ReserveSeats_ConcurrentRequests_RespectsSeatLimit()
     {
@@ -75,6 +90,8 @@ public class ConcurrentTests
         await ResetDatabaseAsync();
 
         var eventId = await CreateTestEventAsync(totalSeats: 5);
+        var userId = await CreateTestUserAsync();
+
         const int concurrentRequests = 20;
 
         var successfulReservations = new ConcurrentBag<int>();
@@ -90,7 +107,7 @@ public class ConcurrentTests
                     using var scope = CreateScope();
                     var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
 
-                    await bookingService.CreateBookingAsync(eventId);
+                    await bookingService.CreateBookingAsync(eventId, userId);
                     lock (lockObj)
                     {
                         successfulReservations.Add(i);
@@ -129,12 +146,9 @@ public class ConcurrentTests
     {
         await ResetDatabaseAsync();
 
-        var @event = Event.Create("Test", DateTime.UtcNow.AddHours(1), DateTime.UtcNow.AddHours(2), 10, "Test");
-        await using var ctx = CreateContext();
-        ctx.Events.Add(@event);
-        await ctx.SaveChangesAsync();
+        var userId = await CreateTestUserAsync();
+        var eventId = await CreateTestEventAsync();
 
-        var eventId = @event.Id;
         var totalBookings = 10;
 
         var tasks = Enumerable.Range(1, totalBookings)
@@ -142,7 +156,7 @@ public class ConcurrentTests
             {
                 using var scope = CreateScope();
                 var bookingRepo = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
-                var booking = new Booking(eventId);
+                var booking = new Booking(eventId, userId);
                 await bookingRepo.AddAsync(booking, CancellationToken.None);
                 await bookingRepo.SaveChangesAsync();
             }))
@@ -172,7 +186,9 @@ public class ConcurrentTests
 
         const int totalSeats = 5;
         const int concurrentRequests = 20;
+
         var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
+        var userId = await CreateTestUserAsync();
 
         var tasks = Enumerable.Range(0, concurrentRequests)
             .Select(_ => Task.Run(async () =>
@@ -181,7 +197,7 @@ public class ConcurrentTests
                 var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
                 try
                 {
-                    await bookingService.CreateBookingAsync(eventId);
+                    await bookingService.CreateBookingAsync(eventId, userId);
                     return true;
                 }
                 catch (NoAvailableSeatsException)
@@ -205,6 +221,8 @@ public class ConcurrentTests
         const int totalSeats = 10;
         const int concurrentRequests = 10;
         var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
+        var userId = await CreateTestUserAsync();
+
         var bookingIds = new System.Collections.Concurrent.ConcurrentBag<Guid>();
 
         var tasks = Enumerable.Range(0, concurrentRequests)
@@ -212,7 +230,7 @@ public class ConcurrentTests
             {
                 using var scope = CreateScope();
                 var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
-                var booking = await bookingService.CreateBookingAsync(eventId);
+                var booking = await bookingService.CreateBookingAsync(eventId, userId);
                 bookingIds.Add(booking.Id);
             }));
 
@@ -227,25 +245,15 @@ public class ConcurrentTests
         await ResetDatabaseAsync();
 
         const int totalSeats = 2;
-        var @event = Event.Create(
-            "Test Event",
-            DateTime.UtcNow.AddHours(1),
-            DateTime.UtcNow.AddHours(3),
-            totalSeats,
-            "Test");
-
-        await using var ctx = CreateContext();
-        ctx.Events.Add(@event);
-        await ctx.SaveChangesAsync();
-
-        var eventId = @event.Id;
+        var eventId = await CreateTestEventAsync(totalSeats: totalSeats);
+        var userId = await CreateTestUserAsync();
 
         // Занять все места
         for (int i = 0; i < totalSeats; i++)
         {
             using var scope = CreateScope();
             var bookingService = scope.ServiceProvider.GetRequiredService<IBookingService>();
-            await bookingService.CreateBookingAsync(eventId);
+            await bookingService.CreateBookingAsync(eventId, userId);
         }
 
         // Проверить, что мест нет
@@ -258,6 +266,6 @@ public class ConcurrentTests
         var failBookingService = failScope.ServiceProvider.GetRequiredService<IBookingService>();
 
         await Assert.ThrowsAsync<NoAvailableSeatsException>(() =>
-            failBookingService.CreateBookingAsync(eventId));
+            failBookingService.CreateBookingAsync(eventId, userId));
     }
 }

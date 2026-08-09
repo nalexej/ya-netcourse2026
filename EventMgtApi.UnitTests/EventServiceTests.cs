@@ -1,12 +1,15 @@
-﻿using EventMgtApi.Application.DTOs;
+﻿using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Application.DTOs;
 using EventMgtApi.Application.Interfaces;
 using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
+using EventMgtApi.Domain.Options;
 using EventMgtApi.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace EventMgtApi.Tests;
@@ -18,6 +21,8 @@ public sealed class EventServiceTests : IDisposable
 
     private readonly Mock<IBookingRepository> _bookingRepoMock;
     private readonly Mock<IEventRepository> _eventRepoMock;
+    private readonly Mock<IOptions<BookingOptions>> _bookingOptionsMock;
+
     private readonly IEventService _eventService;
     private readonly IBookingService _bookindService;
 
@@ -34,7 +39,9 @@ public sealed class EventServiceTests : IDisposable
 
         _bookingRepoMock = new Mock<IBookingRepository>();
         _eventRepoMock = new Mock<IEventRepository>();
-        _bookindService = new BookingService(_eventRepoMock.Object, _bookingRepoMock.Object);
+        _bookingOptionsMock = new Mock<IOptions<BookingOptions>>();
+
+        _bookindService = new BookingService(_eventRepoMock.Object, _bookingRepoMock.Object, _bookingOptionsMock.Object);
         _eventService = new EventService(_eventRepoMock.Object);
     }
 

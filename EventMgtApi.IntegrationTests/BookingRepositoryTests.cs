@@ -33,7 +33,7 @@ public class BookingRepositoryTests
         await context.Database.MigrateAsync();
     }
 
-    private Event CreateTestEvent(AppDbContext context, string title = "Test Event")
+    private async Task<Guid> CreateTestEvent(AppDbContext context, string title = "Test Event")
     {
         var @event = Event.Create(
             title: title,
@@ -44,7 +44,15 @@ public class BookingRepositoryTests
 
         context.Events.Add(@event);
         context.SaveChanges();
-        return @event;
+        return @event.Id;
+    }
+
+    private async Task<Guid> CreateTestUserAsync(AppDbContext context, UserRole userRole = UserRole.User)
+    {
+        var @user = User.Create("testuser_concurrent", "dummyhash", userRole);
+        context.Users.Add(@user);
+        await context.SaveChangesAsync();
+        return @user.Id;
     }
 
     [Fact]
@@ -54,8 +62,10 @@ public class BookingRepositoryTests
         await ResetDatabaseAsync();
         var context = CreateContext();
         var bookingRepo = new BookingRepository(context);
-        var @event = CreateTestEvent(context);
-        var booking = new Booking(@event.Id);
+        var eventId = await CreateTestEvent(context);
+        var userId = await CreateTestUserAsync(context);
+
+        var booking = new Booking(eventId, userId);
 
         // Act
         await bookingRepo.AddAsync(booking, CancellationToken.None);
@@ -91,8 +101,11 @@ public class BookingRepositoryTests
         var context = CreateContext();
         var repo = new BookingRepository(context);
 
-        var @event = CreateTestEvent(context);
-        var booking = new Booking(@event.Id);
+        var eventId = await CreateTestEvent(context);
+        var userId = await CreateTestUserAsync(context);
+
+        var booking = new Booking(eventId, userId);
+
         await repo.AddAsync(booking, CancellationToken.None);
         await repo.SaveChangesAsync();
 
@@ -104,7 +117,7 @@ public class BookingRepositoryTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal(booking.Id, result!.Id);
-        Assert.Equal(@event.Id, result.EventId);
+        Assert.Equal(eventId, result.EventId);
         Assert.Equal(BookingStatus.Pending, result.Status);
     }
 
@@ -135,12 +148,14 @@ public class BookingRepositoryTests
         var context = CreateContext();
         var repo = new BookingRepository(context);
 
-        var @event = CreateTestEvent(context);
+        var eventId = await CreateTestEvent(context);
+        var userId = await CreateTestUserAsync(context);
+
         var bookings = new List<Booking>
         {
-            new Booking(@event.Id),
-            new Booking(@event.Id),
-            new Booking(@event.Id)
+            new Booking(@eventId, userId),
+            new Booking(@eventId, userId),
+            new Booking(@eventId, userId),
         };
 
         foreach (var b in bookings) await repo.AddAsync(b, CancellationToken.None);
@@ -163,14 +178,15 @@ public class BookingRepositoryTests
         var context = CreateContext();
         var repo = new BookingRepository(context);
 
-        var @event1 = CreateTestEvent(context, "Event 1");
-        var @event2 = CreateTestEvent(context, "Event 2");
+        var event1Id = await CreateTestEvent(context, "Event 1");
+        var event2Id = await CreateTestEvent(context, "Event 2");
+        var userId = await CreateTestUserAsync(context);
 
         var bookings = new[]
         {
-            new Booking(@event1.Id),
-            new Booking(@event1.Id),
-            new Booking(@event2.Id)
+            new Booking(event1Id, userId),
+            new Booking(event1Id, userId),
+            new Booking(event2Id, userId)
         };
 
         foreach (var b in bookings) await repo.AddAsync(b, CancellationToken.None);
@@ -179,11 +195,11 @@ public class BookingRepositoryTests
         // Act
         await using var verifyCtx = CreateContext();
         var verifyRepo = new BookingRepository(verifyCtx);
-        var result = await verifyRepo.GetByEventIdAsync(@event1.Id);
+        var result = await verifyRepo.GetByEventIdAsync(event1Id);
 
         // Assert
         Assert.Equal(2, result.Count());
-        Assert.All(result, b => Assert.Equal(@event1.Id, b.EventId));
+        Assert.All(result, b => Assert.Equal(event1Id, b.EventId));
     }
 
     [Fact]
@@ -209,12 +225,14 @@ public class BookingRepositoryTests
         var context = CreateContext();
         var repo = new BookingRepository(context);
 
-        var @event = CreateTestEvent(context);
+        var eventId = await CreateTestEvent(context);
+        var userId = await CreateTestUserAsync(context);
+
         var bookings = new[]
         {
-            new Booking(@event.Id){Status = BookingStatus.Pending},
-            new Booking(@event.Id){Status = BookingStatus.Pending},
-            new Booking(@event.Id){Status = BookingStatus.Confirmed},
+            new Booking(eventId, userId){Status = BookingStatus.Pending},
+            new Booking(eventId, userId){Status = BookingStatus.Pending},
+            new Booking(eventId, userId){Status = BookingStatus.Confirmed},
         };
 
         foreach (var b in bookings) await repo.AddAsync(b, CancellationToken.None);
@@ -238,14 +256,16 @@ public class BookingRepositoryTests
         var context = CreateContext();
         var repo = new BookingRepository(context);
 
-        var @event = CreateTestEvent(context);
+        var eventId = await CreateTestEvent(context);
+        var userId = await CreateTestUserAsync(context);
+
         var bookings = new[]
         {
-            new Booking(@event.Id){Status = BookingStatus.Pending},
-            new Booking(@event.Id){Status = BookingStatus.Pending},
-            new Booking(@event.Id){Status = BookingStatus.Confirmed},
-            new Booking(@event.Id){Status = BookingStatus.Pending},
-            new Booking(@event.Id){Status = BookingStatus.Rejected}
+            new Booking(eventId, userId){Status = BookingStatus.Pending},
+            new Booking(eventId, userId){Status = BookingStatus.Pending},
+            new Booking(eventId, userId){Status = BookingStatus.Confirmed},
+            new Booking(eventId, userId){Status = BookingStatus.Pending},
+            new Booking(eventId, userId){Status = BookingStatus.Rejected}
         };
 
         foreach (var b in bookings) await repo.AddAsync(b, CancellationToken.None);
@@ -268,8 +288,10 @@ public class BookingRepositoryTests
         var context = CreateContext();
         var repo = new BookingRepository(context);
 
-        var @event = CreateTestEvent(context);
-        var booking = new Booking(@event.Id) { Status = BookingStatus.Pending };
+        var eventId = await CreateTestEvent(context);
+        var userId = await CreateTestUserAsync(context);
+
+        var booking = new Booking(eventId, userId) { Status = BookingStatus.Pending };
         await repo.AddAsync(booking, CancellationToken.None);
         await repo.SaveChangesAsync();
 
@@ -288,4 +310,5 @@ public class BookingRepositoryTests
         var updated = await verifyRepo.GetByIdAsync(booking.Id);
         Assert.Equal(BookingStatus.Rejected, updated!.Status);
     }
+
 }
