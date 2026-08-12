@@ -127,7 +127,8 @@ API предоставляет полный цикл операций **CRUD**:
 ```
 
 > ⚠️ appsettings.Development.json уже добавлен в .gitignore.
-> Если вы хотите изменить список администраторов или пароли — редактируйте только appsettings.Development.json
+> Если вы хотите изменить список администраторов или пароли — редактируйте только appsettings.Development.json: создайте данный файл в корневой папке проекта EventMgtApi.Web, взяв за основу appsettings.json, и заполните недостающими значениями.
+
 ---
 
 ### 🔍 Фильтрация при GET /events
@@ -176,18 +177,20 @@ API предоставляет полный цикл операций **CRUD**:
 #### Создайте базу данных:
 
 ```bash
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE eventapi;"
+PGPASSWORD={YOUR_PASSWORD} psql -h localhost -p 5432 -U {YOUR_USER} -c "CREATE DATABASE eventapi;"
 ```
 
-#### Добавьте строку подключения в appsettings.json:
+#### Добавьте строку подключения в appsettings.Development.json:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username=postgres;Password=postgres"
+    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username={YOUR_USER};Password={YOUR_PASSWORD}"
   }
 } 
 ```
+На стенде разработки секреты хранятся в appsettings.Development.json - создайте данный файл в корневой папке проекта EventMgtApi.Web, взяв за основу appsettings.json, и заполните недостаюшими значениями.
+
 
 #### 🧱 Миграции с Entity Framework Core
 
@@ -266,8 +269,8 @@ dotnet run --project EventMgtApi.Web/EventMgtApi.Web.csproj --urls "https://loca
 
    ```json 
    {
-     "login": "admin",
-     "password": "Admin123!"
+     "login": "MyUserName",
+     "password": "pass123"
    }
    ```
 
@@ -276,8 +279,8 @@ dotnet run --project EventMgtApi.Web/EventMgtApi.Web.csproj --urls "https://loca
    ```json 
    {
      "token": "eyJhbGciOiJIUzI1NiIs...",
-     "login": "admin",
-     "role": "Admin"
+     "login": "MyUserName"
+	 "role": "User"
    }
    ```
 ### Шаг 3. Скопируйте токен
@@ -511,9 +514,8 @@ GET /api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
 POST /api/auth/register
 
 {
-  "login": "admin",
-  "password": "admin1",
-  "role": "Admin"
+  "login": "MyUserLogin",
+  "password": "Mypwd123!"
 }
 ```
 
@@ -530,8 +532,8 @@ POST /api/auth/register
 POST /api/auth/login
 
 {
-  "login": "admin",
-  "password": "admin1"
+  "login": "MyUserName",
+  "password": "pass123"
 }
 ```
 
@@ -539,8 +541,8 @@ POST /api/auth/login
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cC...",
-  "login": "admin",
-  "role": "Admin"
+  "login": "MyUserName",
+  "role": "User"
 }
 ```
 
@@ -837,16 +839,13 @@ EventMgtService.sln
 }
 ```
 
-Строки Jwt:Issuer, Jwt:Audience, Jwt:Secret и Jwt:ExpiryMinutes подхватываются из appsettings.json
-
 > 🔒 Безопасность секрета:
 
-- Никогда не коммитьте реальный секрет в репозиторий.
-- В локальной разработке используйте любое случайное значение (минимум 32 символа).
+- На стенде разработки секреты хранятся в appsettings.Development.json - создайте данный файл в корневой папке проекта EventMgtApi.Web, взяв за основу appsettings.json, и заполните недостаюшими значениями.
+- Для Jwt:Secret используйте любое случайное значение (минимум 32 символа).
 - В продакшене секрет должен задаваться через защищённый источник:
 	- Переменные окружения (не через appsettings.json);
 	- Azure Key Vault, AWS Secrets Manager, HashiCorp Vault;
-	или dotnet user-secrets при локальной разработке.
 
 ## ⚙️ Seed-конфигурация
 
@@ -911,7 +910,6 @@ dotnet test
 
 - Часовые пояса не обрабатываются (все даты в UTC).
 - Нет поддержки refresh-токенов.
-- Секрет JWT хранится в конфигурации открыто (см. рекомендации по безопасности).
 
 ---
 
