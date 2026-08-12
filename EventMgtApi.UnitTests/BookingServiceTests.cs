@@ -5,7 +5,10 @@ using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using EventMgtApi.Domain.Exceptions;
 using EventMgtApi.Domain.Options;
+using EventMgtApi.Infrastructure.BackgroundServices;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using System.Reflection;
@@ -526,4 +529,102 @@ public class BookingServiceTests
         _eventRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>
+    /// Тест: При ошибке обработки брони в BackgroundService место должно освободиться.
+    /// </summary>
+    [Fact]
+    public async Task BackgroundService_ProcessBooking_OnError_ShouldReleaseSeats()
+    {
+        // Arrange
+        var bookingId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        // Создаем событие с 9 свободными местами (1 место "занято" этой бронью)
+        var testEvent = TestDataFactory.CreateTestEvent(
+            totalSeats: 10,
+            startAt: DateTime.UtcNow.AddHours(1),
+            endAt: DateTime.UtcNow.AddHours(2),
+            availableSeats: 9
+        );
+        var eventId = testEvent.Id;
+
+        var testBooking = new Booking(eventId, userId)
+        {
+            Id = bookingId,
+            Status = BookingStatus.Pending
+        };
+
+        // 1. Моки BookingRepo
+        _bookingRepoMock
+            .Setup(r => r.GetByIdAsync(bookingId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(testBooking);
+
+        int bookingSaveChangesCallCount = 0;
+        _bookingRepoMock
+            .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => bookingSaveChangesCallCount++)
+            .Returns(async () =>
+            {
+                // Первый вызов (в try блоке) выбрасывает ошибку
+                if (bookingSaveChangesCallCount == 1)
+                {
+                    throw new InvalidOperationException("Simulated error in try");
+                }
+                return Task.CompletedTask;
+            });
+
+        // 2. Моки EventRepo
+        // Счетчик вызовов GetByIdAsync для проверки логики восстановления
+        int eventGetByIdCallCount = 0;
+        _eventRepoMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(testEvent)
+            .Callback(() => eventGetByIdCallCount++);
+
+        // SaveChanges для EventRepo всегда успешен
+        _eventRepoMock
+            .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // 3. DI Setup
+        var services = new ServiceCollection();
+        services.AddSingleton<IEventRepository>(_eventRepoMock.Object);
+        services.AddSingleton<IBookingRepository>(_bookingRepoMock.Object);
+
+        var serviceProvider = services.BuildServiceProvider();
+
+        var mockScope = new Mock<IServiceScope>();
+        mockScope.Setup(s => s.ServiceProvider).Returns(serviceProvider);
+
+        var mockScopeFactory = new Mock<IServiceScopeFactory>();
+        mockScopeFactory.Setup(f => f.CreateScope()).Returns(mockScope.Object);
+
+        var logger = new LoggerFactory().CreateLogger<BookingProcessingBackgroundService>();
+        var service = new BookingProcessingBackgroundService(mockScopeFactory.Object, logger);
+
+        var method = typeof(BookingProcessingBackgroundService).GetMethod(
+            "ProcessBookingAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // Act
+        using var cts = new CancellationTokenSource();
+        var task = (Task)method!.Invoke(service, new object[] { bookingId, cts.Token })!;
+        await task;
+
+        // Assert
+        // 1. Броня должна быть отклонена
+        testBooking.Status.Should().Be(BookingStatus.Rejected);
+
+        // 2. Место должно вернуться в пул (было 9, стало 10)
+        testEvent.AvailableSeats.Should().Be(10);
+
+        // 3. SaveChanges BookingRepo был вызван 1 раз (ошибка в try, во время восстановления он не сохраняется)
+        bookingSaveChangesCallCount.Should().Be(1);
+
+        // 4. EventRepo GetById вызывался хотя бы 1 раз (в try и в catch восстановления)
+        eventGetByIdCallCount.Should().BeGreaterThanOrEqualTo(1);
+
+        // 5. EventRepo SaveChanges должен быть вызван для сохранения изменения мест
+        _eventRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+    }
 }

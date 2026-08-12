@@ -157,9 +157,9 @@ public class BookingProcessingBackgroundService : BackgroundService
                     bkg.Reject();
                     var evt = await eventRepository.GetByIdAsync(bkg.EventId, stoppingToken);
 
-                    if (@evt is not null)
+                    if (evt is not null)
                     {
-                        @evt.ReleaseSeats(_seatsToReleaseOnReject); // возвращаем место
+                        evt.ReleaseSeats(_seatsToReleaseOnReject); // возвращаем место
                         await eventRepository.SaveChangesAsync(stoppingToken);
                     }
                 }
