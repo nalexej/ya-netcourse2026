@@ -419,6 +419,9 @@ public class BookingServiceTests
         _bookingRepoMock.Setup(repo => repo.GetByIdAsync(booking.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(booking);
 
+        _eventRepoMock.Setup(r => r.GetByIdAsync(@event.Id, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(@event);
+
         // Act
         var result = await _service.CancelBookingAsync(booking.Id, adminId, isAdmin);
 
@@ -453,6 +456,9 @@ public class BookingServiceTests
         _bookingRepoMock.Setup(repo => repo.GetByIdAsync(booking.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(booking);
 
+        _eventRepoMock.Setup(r => r.GetByIdAsync(@event.Id, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(@event);
+
         // Act
         var result = await _service.CancelBookingAsync(booking.Id, userId, isAdmin);
 
@@ -460,6 +466,64 @@ public class BookingServiceTests
         Assert.NotNull(result);
         Assert.Equal(BookingStatus.Cancelled, booking.Status);
         _bookingRepoMock.Verify(repo => repo.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Тест: При отмене брони количество доступных мест на событии увеличивается.
+    /// </summary>
+    [Fact]
+    public async Task CancelBookingAsync_ShouldIncreaseAvailableSeats_WhenBookingIsCancelled()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var isAdmin = false;
+
+        // Исходное количество мест
+        var initialAvailableSeats = 5;
+
+        // 1. Создаем событие с известным количеством мест
+        var @event = TestDataFactory.CreateTestEvent(
+            totalSeats: 10,
+            startAt: DateTime.UtcNow.AddHours(1), // Будущее событие
+            endAt: DateTime.UtcNow.AddHours(2),
+            availableSeats: initialAvailableSeats
+        );
+
+        // 2. Создаем бронь
+        var booking = TestDataFactory.CreateBooking(
+            eventId: @event.Id,
+            userId: userId,
+            status: BookingStatus.Confirmed
+        );
+
+        booking.EventId = @event.Id;
+
+        // 3. Настраиваем моки репозиториев
+        _bookingRepoMock.Setup(r => r.GetByIdAsync(booking.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(booking);
+
+        _bookingRepoMock.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _eventRepoMock.Setup(r => r.GetByIdAsync(@event.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(@event);
+
+        _eventRepoMock.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.CancelBookingAsync(booking.Id, userId, isAdmin);
+
+        // Assert
+        // 1. Проверяем, что AvailableSeats увеличился на 1
+        @event.AvailableSeats.Should().Be(initialAvailableSeats + 1);
+
+        // 2. Проверяем, что статус бронирования стал Cancelled
+        booking.Status.Should().Be(BookingStatus.Cancelled);
+
+        // 3. Проверяем, что методы сохранения были вызваны
+        _bookingRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _eventRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
 }

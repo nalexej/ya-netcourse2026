@@ -5,6 +5,7 @@ using EventMgtApi.Application.Interfaces;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;
 using EventMgtApi.Domain.Options;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace EventMgtApi.Application.Services;
@@ -121,8 +122,14 @@ public class BookingService : IBookingService
 
         // Вызываем метод отмены на сущности (внутри валидация статуса)
         booking.Cancel();
-
         await _bookingRepository.SaveChangesAsync(cancellationToken);
+
+        // Освобождаем место
+        var eventId = booking.EventId;
+        var evt = await _eventRepository.GetByIdAsync(eventId, cancellationToken)
+            ?? throw new NotFoundException($"Событие с ID {eventId} не найдено.");
+        evt.ReleaseSeats();
+        await _eventRepository.SaveChangesAsync(cancellationToken);
 
         return booking.ToDtoResponse();
     }
