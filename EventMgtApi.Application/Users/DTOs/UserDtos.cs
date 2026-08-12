@@ -30,11 +30,6 @@ public sealed class RegisterRequestDto
     /// Пароль пользователя.
     /// </summary>
     public required string Password { get; init; }
-
-    /// <summary>
-    /// Роль пльзователя.
-    /// </summary>
-    public string Role { get; init; } = "User";
 }
 
 /// <summary>

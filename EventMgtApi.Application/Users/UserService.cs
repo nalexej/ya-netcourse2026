@@ -54,9 +54,7 @@ public sealed class UserService : IUserService
         var passwordHash = _passwordHasher.HashPassword(request.Password);
 
         // Создаём пользователя
-        var role = Enum.TryParse(request.Role, ignoreCase: true, out UserRole parsedRole)
-            ? parsedRole
-            : UserRole.User;
+        var role = UserRole.User; // Всегда User, в целях бкзопасности
 
         var user = User.Create(request.Login.Trim(), passwordHash, role);
 

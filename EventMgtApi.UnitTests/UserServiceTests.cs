@@ -39,8 +39,7 @@ public class UserServiceTests
         var request = new RegisterRequestDto
         {
             Login = "newuser@example.com",
-            Password = "StrongPass123",
-            Role = "User" // Строка, как ожидается в DTO
+            Password = "StrongPass123"
         };
 
         _passwordHasherMock.Setup(p => p.HashPassword(request.Password))

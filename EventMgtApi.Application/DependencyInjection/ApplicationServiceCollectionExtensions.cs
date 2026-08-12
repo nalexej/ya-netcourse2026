@@ -1,4 +1,4 @@
-﻿using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Application.Abstractions.Services;
 using EventMgtApi.Application.Services;
 using EventMgtApi.Application.Users;
 using EventMgtApi.Domain.Options;
@@ -15,8 +15,10 @@ namespace EventMgtApi.Application.DependencyInjection
             services.AddScoped<IEventService, EventService>();
             services.AddScoped<IBookingService, BookingService>();
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<ISeedService, SeedService>();
 
             services.Configure<BookingOptions>(options => configuration.GetSection("BookingOptions").Bind(options));
+            services.Configure<SeedOptions>(options => configuration.GetSection("SeedOptions").Bind(options));
 
             return services;
         }

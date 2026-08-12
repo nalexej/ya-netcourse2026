@@ -1,3 +1,4 @@
+using EventMgtApi.Application.Abstractions.Services;
 using EventMgtApi.Application.DependencyInjection;
 using EventMgtApi.Domain.Options;
 using EventMgtApi.Infrastructure.BackgroundServices;
@@ -88,6 +89,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+    
+    var seedService = scope.ServiceProvider.GetRequiredService<ISeedService>();
+    await seedService.SeedAsync();
 }
 
 // Настройка конвейера обработки запросов
