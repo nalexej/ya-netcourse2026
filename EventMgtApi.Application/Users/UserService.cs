@@ -54,7 +54,7 @@ public sealed class UserService : IUserService
         var passwordHash = _passwordHasher.HashPassword(request.Password);
 
         // Создаём пользователя
-        var role = UserRole.User; // Всегда User, в целях бкзопасности
+        var role = UserRole.User; // Всегда User, в целях безопасности
 
         var user = User.Create(request.Login.Trim(), passwordHash, role);
 
@@ -86,11 +86,11 @@ public sealed class UserService : IUserService
         // Ищем пользователя по логину
         var user = await _userRepository.GetByLoginAsync(request.Login, cancellationToken);
         if (user is null)
-            throw new NotFoundException("Неверный логин или пароль.");
+            throw new InvalidCredentialsException("Неверный логин или пароль.");
 
         // Проверяем пароль
         if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
-            throw new NotFoundException("Неверный логин или пароль.");
+            throw new InvalidCredentialsException("Неверный логин или пароль.");
 
         // Генерируем JWT-токен
         var token = _jwtTokenService.GenerateToken(user);

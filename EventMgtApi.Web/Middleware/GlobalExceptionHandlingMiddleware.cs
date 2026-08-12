@@ -68,7 +68,8 @@ public class GlobalExceptionHandlingMiddleware
             NoAvailableSeatsException ex => HandleNoAvailableSeatsExceptionAsync(httpContext, ex),
             TooManyActiveBookingsException ex => HandleTooManyActiveBookingsExceptionAsync(httpContext, ex),
             BookingPastEventException ex => HandleBookingPastEventExceptionAsync(httpContext, ex),
-            ForbiddenException ex => HandleForbiddenExceptionAsync(httpContext, ex), // Добавляем обработчик
+            ForbiddenException ex => HandleForbiddenExceptionAsync(httpContext, ex), 
+            InvalidCredentialsException ex => HandleInvalidCredentialsExceptionAsync(httpContext, ex), 
             _ => HandleInternalServerErrorAsync(httpContext)
         });
     }
@@ -237,6 +238,31 @@ public class GlobalExceptionHandlingMiddleware
 
         await WriteProblemDetailsAsync(context, details);
     }
+
+    /// <summary>
+    /// Обрабатывает <see cref="InvalidCredentialsException"/>, возвращая 401 Unauthorized.
+    /// </summary>
+    private async Task HandleInvalidCredentialsExceptionAsync(HttpContext context, InvalidCredentialsException ex)
+    {
+        _logger.LogWarning(
+            "Доступ запрещен. Method={Method}, Path={Path}, Message={Message}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            ex.Message,
+            context.Request.Headers["x-request-id"].ToString());
+
+        var details = new ProblemDetails
+        {
+            Title = "Доступ запрещен",
+            Status = 401, // Возвращаем 401 Unauthorized
+            Detail = ex.Message,
+            Instance = context.Request.Path
+        };
+
+        await WriteProblemDetailsAsync(context, details);
+    }
+
+
 
     /// <summary>
     /// Обрабатывает необработанные исключения, возвращая 500.

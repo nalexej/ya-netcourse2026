@@ -165,7 +165,7 @@ public class UserServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_UserNotFound_ThrowsNotFoundException()
+    public async Task LoginAsync_UserNotFound_ThrowsInvalidCredentialsException()
     {
         // Arrange
         var request = new LoginRequestDto
@@ -178,13 +178,13 @@ public class UserServiceTests
             .ReturnsAsync((User?)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<NotFoundException>(() =>
+        var exception = await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
             _service.LoginAsync(request));
 
         Assert.Contains("Неверный логин или пароль", exception.Message);
     }
     [Fact]
-    public async Task LoginAsync_WrongPassword_ThrowsNotFoundException()
+    public async Task LoginAsync_WrongPassword_ThrowsInvalidCredentialsException()
     {
         // Arrange
         var request = new LoginRequestDto
@@ -202,7 +202,7 @@ public class UserServiceTests
             .Returns(false);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<NotFoundException>(() =>
+        var exception = await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
             _service.LoginAsync(request));
 
         Assert.Contains("Неверный логин или пароль", exception.Message);
