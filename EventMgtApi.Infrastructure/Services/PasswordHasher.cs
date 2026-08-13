@@ -1,23 +1,26 @@
 using EventMgtApi.Application.Abstractions.Services;
-using System.Security.Cryptography;
-using System.Text;
+using Microsoft.AspNetCore.Identity;
 
 namespace EventMgtApi.Infrastructure.Services;
 
 /// <summary>
-/// Реализация IPasswordHasher на базе SHA-256.
+/// Реализация IPasswordHasher, использующая встроенный в ASP.NET Core PasswordHasher.
+/// Использует PBKDF2 с солью, что безопасно против радужных таблиц.
 /// </summary>
 public class PasswordHasher : IPasswordHasher
 {
+    private readonly PasswordHasher<object> _passwordHasher = new();
+
     public string HashPassword(string password)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        return Convert.ToHexString(bytes);
+        // Передаем null как "user", так как для хэширования пароля данные пользователя не нужны
+        return _passwordHasher.HashPassword(null!, password);
     }
 
     public bool VerifyPassword(string password, string hash)
     {
-        var computedHash = HashPassword(password);
-        return computedHash == hash;
+        // Передаем null как "user"
+        var result = _passwordHasher.VerifyHashedPassword(null!, hash, password);
+        return result == PasswordVerificationResult.Success;
     }
 }
