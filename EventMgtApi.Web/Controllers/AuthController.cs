@@ -1,4 +1,5 @@
 using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Application.DTOs;
 using EventMgtApi.Application.Users.DTOs;
 using EventMgtApi.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -28,18 +29,18 @@ public class AuthController : ControllerBase
     /// Регистрация нового пользователя.
     /// </summary>
     /// <param name="request">Данные регистрации (login, password, optional role).</param>
-    /// <returns>Код 204.</returns>
+    /// <returns>Код 201 Created с данными созданного пользователя.</returns>
     [AllowAnonymous]
     [HttpPost("register")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
+    public async Task<ActionResult<RegisterResponseDto>> Register([FromBody] RegisterRequestDto request)
     {
         if (request == null)
             return BadRequest("Тело запроса не может быть null.");
 
         var result = await _userService.RegisterAsync(request);
-        return NoContent();
+        return Created(String.Empty, result);
     }
 
     /// <summary>
