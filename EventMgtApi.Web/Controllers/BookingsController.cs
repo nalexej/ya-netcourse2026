@@ -64,7 +64,7 @@ public class BookingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<BookingResponseDto>> CancelBooking(Guid id)
+    public async Task<ActionResult> CancelBooking(Guid id)
     {
         // Извлекаем ID пользователя из claims
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
@@ -77,6 +77,6 @@ public class BookingsController : ControllerBase
         var isAdmin = User.IsInRole("Admin");
 
         var booking = await _bookingService.CancelBookingAsync(id, userId, isAdmin);
-        return Ok(booking);
+        return NoContent();
     }
 }
