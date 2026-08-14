@@ -89,13 +89,20 @@ public class BookingService : IBookingService
     }
 
     /// <inheritdoc />
-    public async Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId, CancellationToken cancellationToken = default)
+    public async Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default)
     {
         if (bookingId == Guid.Empty)
             throw new ArgumentException("Идентификатор брони не может быть пустым.", nameof(bookingId));
 
         var booking = await _bookingRepository.GetByIdAsync(bookingId, cancellationToken)
             ?? throw new NotFoundException($"Бронь с ID {bookingId} не найдена.");
+
+        // Проверка прав доступа
+        // Пользователь может запросить только свою бронь, если он не админ
+        if (booking.UserId != currentUserId && !isAdmin)
+        {
+            throw new ForbiddenException("Недостаточно прав для запроса данных данной брони: Вы можете запросить только свою бронь.");
+        }
 
         return booking.ToDtoResponse();
     }

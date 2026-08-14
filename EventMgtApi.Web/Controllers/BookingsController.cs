@@ -38,13 +38,24 @@ public class BookingsController : ControllerBase
     [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<BookingResponseDto>> GetBookingById(Guid id)
     {
         if (id == Guid.Empty)
             return BadRequest("Идентификатор брони не может быть пустым.");
 
-        var booking = await _bookingService.GetBookingByIdAsync(id);
+        // Извлекаем ID пользователя из claims
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+        {
+            return BadRequest();
+        }
+
+        // Проверяем роль администратора
+        var isAdmin = User.IsInRole("Admin");
+
+        var booking = await _bookingService.GetBookingByIdAsync(id, userId, isAdmin);
 
         if (booking == null)
             return NotFound();

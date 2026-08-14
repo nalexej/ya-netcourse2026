@@ -24,10 +24,12 @@ public interface IBookingService
     /// Асинхронно получает бронь по идентификатору.
     /// </summary>
     /// <param name="bookingId">Уникальный идентификатор брони.</param>
+    /// <param name="userId">Идентификатор текущего пользователя.</param>
+    /// <param name="isAdmin">Флаг, является ли пользователь администратором.</param>
     /// <param name="cancellationToken">Токен отмены.</param>
     /// <returns>DTO найденной брони.</returns>
     /// <exception cref="Domain.Exceptions.NotFoundException">Выбрасывается, если бронь с указанным ID не найдена.</exception>
-    Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId, CancellationToken cancellationToken = default);
+    Task<BookingResponseDto> GetBookingByIdAsync(Guid bookingId, Guid userId, bool isAdmin, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Отменяет бронь по идентификатору.

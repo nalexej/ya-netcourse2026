@@ -91,7 +91,7 @@ public class BookingServiceTests
             .ReturnsAsync(booking);
 
         // Act
-        var result = await _service.GetBookingByIdAsync(booking.Id);
+        var result = await _service.GetBookingByIdAsync(booking.Id, userId, false);
 
         // Assert — сравниваем ПО ПОЛЯМ, исключая Event (навигационное)
         result.Should().NotBeNull();
@@ -117,8 +117,8 @@ public class BookingServiceTests
             .ReturnsAsync(confirmed);
 
         // Act
-        var first = await _service.GetBookingByIdAsync(bookingId);
-        var second = await _service.GetBookingByIdAsync(bookingId);
+        var first = await _service.GetBookingByIdAsync(bookingId, userId, false);
+        var second = await _service.GetBookingByIdAsync(bookingId, userId, false);
 
         // Assert
         first?.Status.Should().Be(BookingStatus.Pending);
@@ -191,6 +191,42 @@ public class BookingServiceTests
             _service.CreateBookingAsync(@event.Id, Guid.NewGuid()));
     }
 
+    /// <summary>
+    /// Тест: Администратор может запросить бронь любого пользователя.
+    /// </summary>
+    [Fact]
+    public async Task GetBookingByIdAsync_AdminCanRequestAnyBooking_ShouldSucceed()
+    {
+        // Arrange
+        var eventId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid(); // Владелец брони
+        var adminId = Guid.NewGuid();     // Администратор (запрашивает)
+        var isAdmin = true;
+
+        // Создаем мок бронирования, принадлежащего другому пользователю
+        var booking = TestDataFactory.CreateBooking(eventId, ownerUserId, BookingStatus.Confirmed);
+
+        _bookingRepoMock
+            .Setup(r => r.GetByIdAsync(booking.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(booking);
+
+        // Инициализируем сервис с настройками (если они нужны, либо берем из конструктора)
+        var service = new BookingService(
+            _eventRepoMock.Object,
+            _bookingRepoMock.Object,
+            _bookingOptionsMock.Object
+        );
+
+        // Act
+        var result = await service.GetBookingByIdAsync(booking.Id, adminId, isAdmin);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Id.Should().Be(booking.Id);
+        result.UserId.Should().Be(ownerUserId); // Убеждаемся, что вернулась именно эта бронь
+    }
+
+
     // === НЕУСПЕШНЫЕ СЦЕНАРИИ ===
 
     [Fact]
@@ -245,12 +281,13 @@ public class BookingServiceTests
     public async Task GetBookingByIdAsync_NonExistingId_ThrowsNotFoundException()
     {
         // Arrange
+        var userId = Guid.NewGuid();
         var nonExistingBookingId = Guid.NewGuid();
         _bookingRepoMock.Setup(r => r.GetByIdAsync(nonExistingBookingId)).ReturnsAsync((Booking?)null);
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<NotFoundException>
-                (async () => await _service.GetBookingByIdAsync(nonExistingBookingId));
+                (async () => await _service.GetBookingByIdAsync(nonExistingBookingId, userId, false));
 
         Assert.Contains($"Бронь с ID {nonExistingBookingId} не найдена", exception.Message);
     }
@@ -627,4 +664,36 @@ public class BookingServiceTests
         // 5. EventRepo SaveChanges должен быть вызван для сохранения изменения мест
         _eventRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
+
+    /// <summary>
+    /// Тест: Обычный пользователь не может запросить чужую бронь.
+    /// </summary>
+    [Fact]
+    public async Task GetBookingByIdAsync_UserNotOwnerAndNotAdmin_ShouldThrowForbiddenException()
+    {
+        // Arrange
+        var bookingId = Guid.NewGuid();
+        var ownerUserId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid(); // Пользователь, который делает запрос (не владелец)
+        var isAdmin = false;
+
+        var booking = TestDataFactory.CreateBooking(bookingId, ownerUserId, BookingStatus.Confirmed);
+
+        _bookingRepoMock
+            .Setup(r => r.GetByIdAsync(bookingId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(booking);
+
+        var service = new BookingService(
+            _eventRepoMock.Object,
+            _bookingRepoMock.Object,
+            _bookingOptionsMock.Object
+        );
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ForbiddenException>(() =>
+            service.GetBookingByIdAsync(bookingId, otherUserId, isAdmin));
+
+        exception.Message.Should().Contain("Недостаточно прав");
+    }
+
 }
