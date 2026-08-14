@@ -85,7 +85,9 @@ public sealed class UserService : IUserService
 
         // Ищем пользователя по логину
         var user = await _userRepository.GetByLoginAsync(request.Login, cancellationToken);
-        if (user is null)
+
+        // Если пользователя нет или он системный — сразу отказываем в доступе
+        if (user is null || IsSystemUser(user.Login))
             throw new InvalidCredentialsException("Неверный логин или пароль.");
 
         // Проверяем пароль
@@ -101,5 +103,16 @@ public sealed class UserService : IUserService
             Login = user.Login,
             Role = user.Role.ToString()
         };
+    }
+
+    /// <summary>
+    /// Проверяет, является ли логин системным (заблокирован для входа и регистрации).
+    /// </summary>
+    private bool IsSystemUser(string login)
+    {
+        // Список зарезервированных имен
+        var reservedLogins = new[] { "anonymous" }; // Добавьте нужные
+        return reservedLogins.Any(reserved =>
+            string.Equals(login, reserved, StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -1,4 +1,3 @@
-﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,13 +10,7 @@ namespace EventMgtApi.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<Guid>(
-                name: "UserId",
-                table: "bookings",
-                type: "uuid",
-                nullable: false,
-                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
-
+            // 1. Создаём таблицу users
             migrationBuilder.CreateTable(
                 name: "users",
                 columns: table => new
@@ -32,22 +25,27 @@ namespace EventMgtApi.Migrations
                     table.PrimaryKey("PK_users", x => x.id);
                 });
 
-            migrationBuilder.Sql(@"
-                DELETE FROM bookings 
-                WHERE ""UserId"" NOT IN (SELECT id FROM users);
-            ");
+            // 2. Добавляем колонку UserId (nullable — данные заполним отдельной миграцией)
+            migrationBuilder.AddColumn<Guid>(
+                name: "UserId",
+                table: "bookings",
+                type: "uuid",
+                nullable: true);
 
+            // 3. Индекс по UserId
             migrationBuilder.CreateIndex(
                 name: "IX_bookings_UserId",
                 table: "bookings",
                 column: "UserId");
 
+            // 4. Индекс по логину
             migrationBuilder.CreateIndex(
                 name: "IX_users_login",
                 table: "users",
                 column: "login",
                 unique: true);
 
+            // 5. Foreign key
             migrationBuilder.AddForeignKey(
                 name: "FK_bookings_users_user_id",
                 table: "bookings",
@@ -64,9 +62,6 @@ namespace EventMgtApi.Migrations
                 name: "FK_bookings_users_user_id",
                 table: "bookings");
 
-            migrationBuilder.DropTable(
-                name: "users");
-
             migrationBuilder.DropIndex(
                 name: "IX_bookings_UserId",
                 table: "bookings");
@@ -74,6 +69,13 @@ namespace EventMgtApi.Migrations
             migrationBuilder.DropColumn(
                 name: "UserId",
                 table: "bookings");
+
+            migrationBuilder.DropIndex(
+                name: "IX_users_login",
+                table: "users");
+
+            migrationBuilder.DropTable(
+                name: "users");
         }
     }
 }

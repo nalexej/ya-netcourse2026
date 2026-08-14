@@ -9,7 +9,6 @@ namespace EventMgtApi.Web.Controllers;
 /// <summary>
 /// Контроллер для аутентификации и регистрации пользователей.
 /// </summary>
-[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
