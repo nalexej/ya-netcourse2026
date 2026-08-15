@@ -52,7 +52,7 @@ public class ConcurrentTests
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
         services.AddSingleton<IOptions<BookingOptions>>(
-            new OptionsWrapper<BookingOptions>(new BookingOptions { MaxActiveBookings = 10 }));
+            new OptionsWrapper<BookingOptions>(new BookingOptions { MaxActiveBookings = 100 }));
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider.CreateScope();

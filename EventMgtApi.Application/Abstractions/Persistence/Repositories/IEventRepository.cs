@@ -64,6 +64,24 @@ namespace EventMgtApi.Application.Interfaces
         /// </summary>
         /// <param name="ct">Токен отмены.</param>
         /// <returns>Задача, представляющая операцию сохранения.</returns>
+
+        /// <summary>
+        /// Выполняет операцию в транзакции с оптимистичным контролем параллелизма и retry-логикой.
+        /// Если операция выбрасывает DbUpdateConcurrencyException — повторяет до maxRetries раз.
+        /// Любое другое исключение пробрасывается наружу без повторов.
+        /// </summary>
+        Task<T> ExecuteWithConcurrencyRetryAsync<T>(
+            Func<Task<T>> operation,
+            int maxRetries = 3,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Загружает событие с пессимистичной блокировкой (SELECT ... FOR UPDATE)
+        /// в рамках переданной транзакции. Гарантирует, что никто другой не изменит
+        /// AvailableSeats до фиксации транзакции.
+        /// </summary>
+        Task<Event?> GetWithLockAsync(Guid id, CancellationToken ct = default);
+
         Task SaveChangesAsync(CancellationToken ct = default);
     }
 }

@@ -47,6 +47,11 @@ namespace EventMgtApi.Domain.Entities
         public int AvailableSeats { get; set; }
 
         /// <summary>
+        /// Маркер версии строки для оптимистичного контроля параллелизма.
+        /// </summary>
+        public byte[] RowVersion { get; set; } = [];
+
+        /// <summary>
         /// Навигационное свойство: список бронирований.
         /// </summary>
         public ICollection<Booking> Bookings { get; private set; } = [];
