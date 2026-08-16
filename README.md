@@ -437,7 +437,7 @@ API возвращает ошибки в стандартизированном 
 Создаёт новую бронь на указанное событие.  
 Бронь изначально имеет статус `Pending`.
 
-> **HTTP 202 Accepted** — бронь принята в обработку  
+> **HTTP 201 Created** — бронь создана и принята в обработку  
 > **HTTP 409 Conflict** — отсутствуют свободные места (овербукинг)  
 > **Location** — ссылка на `GET /api/bookings/{id}`
 
@@ -455,7 +455,7 @@ Content-Type: application/json
 
 #### Успешный ответ:
 ```http
-HTTP/1.1 202 Accepted
+HTTP/1.1 201 Accepted
 Location: https://localhost:7001/api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
 ```
 
@@ -710,13 +710,13 @@ POST /api/events/event-id/book
    - Проверяет: `AvailableSeats == 2` → OK
    - Уменьшает: `AvailableSeats = 1`
    - Создаёт бронь со статусом `Pending`
-   - Возвращает `202 Accepted`
+   - Возвращает `201 Created`
 
 2. **Запрос 2** ждёт, затем заходит в критическую секцию:
    - Проверяет: `AvailableSeats == 1` → OK
    - Уменьшает: `AvailableSeats = 0`
    - Создаёт бронь со статусом `Pending`
-   - Возвращает `202 Accepted`
+   - Возвращает `201 Created`
 
 3. **Запрос 3** ждёт, затем заходит в критическую секцию:
    - Проверяет: `AvailableSeats == 0` → ❌
