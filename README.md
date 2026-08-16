@@ -169,14 +169,33 @@ API предоставляет полный цикл операций **CRUD**:
 ### Предварительные требования
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **PostgreSQL 14+** (локально или в Docker)
-
+- **[Docker](https://www.docker.com/)** (для быстрого запуска PostgreSQL через `docker compose up -d`)
 ---
+
 
 ### Настройка PostgreSQL
 
 Сервер PostgreSQL может быть запущен локально или в Docker.
 
-#### Создайте базу данных:
+#### Запуск PostgreSQL через Docker (рекомендуется)
+
+Проще всего запустить PostgreSQL с помощью `docker compose`:
+
+```bash
+docker compose up -d
+```
+Это запустит контейнер с PostgreSQL по умолчанию:
+
+| Параметр   |   Значение  |
+|------------|-------------|
+| Host       | `localhost` |
+| Port       | `5432`      |
+| Database   | `eventapi`  |
+| Username   | `postgres`  |
+| Password   | `postgres`  |
+
+#### Создайте базу данных (ручной способ):
+
 
 ```bash
 PGPASSWORD={YOUR_PASSWORD} psql -h localhost -p 5432 -U {YOUR_USER} -c "CREATE DATABASE eventapi;"
