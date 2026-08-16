@@ -164,14 +164,14 @@ public class EventsController : ControllerBase
     /// <param name="eventId">Идентификатор события, на которое создаётся бронь.</param>
     /// <param name="request">DTO с данными для создания брони (заглушка).</param>
     /// <returns>Информация о созданной брони.</returns>
-    /// <response code="202">Бронь успешно создана. Возвращён объект и заголовок Location.</response>
+    /// <response code="201">Бронь успешно создана. Возвращён объект и заголовок Location.</response>
     /// <response code="400">Событие уже началось/ некорректный запрос.</response>
     /// <response code="401">Требуется аутентификация.</response>
     /// <response code="404">Событие с указанным ID не найдено.</response>
     /// <response code="409">Нет доступных мест или превышен лимит броней.</response>
     [Authorize]
     [HttpPost("{eventId:guid}/book")]
-    [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)] //событие уже началось
     [ProducesResponseType(StatusCodes.Status401Unauthorized)] //требует аутентификации
     [ProducesResponseType(StatusCodes.Status404NotFound)] // событие не найдено
@@ -188,9 +188,8 @@ public class EventsController : ControllerBase
 
         var booking = await _bookingService.CreateBookingAsync(eventId, userId);
 
-        var locationUri = Url.Action("GetBookingById", "Bookings", new { id = booking.Id }, Request.Scheme);
-        Response.Headers.Location = locationUri;
-
-        return Accepted(booking);
+        return Created(
+            Url.Action("GetBookingById", "Bookings", new { id = booking.Id }, Request.Scheme)!,
+            booking);
     }
 }
