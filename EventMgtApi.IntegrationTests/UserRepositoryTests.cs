@@ -1,7 +1,6 @@
 ﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using EventMgtApi.Infrastructure.Persistence;
-using EventMgtApi.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;

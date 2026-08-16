@@ -1,5 +1,5 @@
 using EventMgtApi.Application.Abstractions.Services;
-using EventMgtApi.Application.Interfaces;
+using EventMgtApi.Application.Abstractions.Persistence.Repositories;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Options;
 using EventMgtApi.Domain.Enums;

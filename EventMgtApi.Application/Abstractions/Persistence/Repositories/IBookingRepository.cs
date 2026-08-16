@@ -1,7 +1,7 @@
 ﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 
-namespace EventMgtApi.Application.Interfaces;
+namespace EventMgtApi.Application.Abstractions.Persistence.Repositories;
 
 /// <summary>
 /// Интерфейс репозитория для управления бронированиями.

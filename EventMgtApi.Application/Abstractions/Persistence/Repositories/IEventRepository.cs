@@ -1,7 +1,7 @@
 ﻿using EventMgtApi.Application.DTOs;
 using EventMgtApi.Domain.Entities;
 
-namespace EventMgtApi.Application.Interfaces
+namespace EventMgtApi.Application.Abstractions.Persistence.Repositories
 {
     /// <summary>
     /// Интерфейс для доступа к данным событий.

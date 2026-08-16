@@ -1,6 +1,6 @@
-﻿using EventMgtApi.Application.Abstractions.Services;
+﻿using EventMgtApi.Application.Abstractions.Persistence.Repositories;
+using EventMgtApi.Application.Abstractions.Services;
 using EventMgtApi.Application.DTOs;
-using EventMgtApi.Application.Interfaces;
 using EventMgtApi.Application.Services;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Exceptions;

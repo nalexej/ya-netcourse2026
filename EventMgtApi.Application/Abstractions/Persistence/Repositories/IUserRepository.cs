@@ -1,6 +1,6 @@
 using EventMgtApi.Domain.Entities;
 
-namespace EventMgtApi.Application.Interfaces;
+namespace EventMgtApi.Application.Abstractions.Persistence.Repositories;
 
 /// <summary>
 /// Интерфейс репозитория для работы с пользователями.

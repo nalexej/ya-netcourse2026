@@ -1,4 +1,4 @@
-using EventMgtApi.Application.Interfaces;
+using EventMgtApi.Application.Abstractions.Persistence.Repositories;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
