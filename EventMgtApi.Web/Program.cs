@@ -1,7 +1,5 @@
 using EventMgtApi.Application.Abstractions.Services;
 using EventMgtApi.Application.DependencyInjection;
-using EventMgtApi.Domain.Options;
-using EventMgtApi.Infrastructure.BackgroundServices;
 using EventMgtApi.Infrastructure.DependencyInjection;
 using EventMgtApi.Infrastructure.Persistence;
 using EventMgtApi.Web.Extensions;
@@ -12,6 +10,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Reflection;
 using System.Text;
+using EventMgtApi.Web.Middleware;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,13 +49,12 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"]!))
     };
+    options.Events = new JwtBearerEventsFactory().Create();
 });
 
 // Регистрация слоев через расширения
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
-
-
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();
