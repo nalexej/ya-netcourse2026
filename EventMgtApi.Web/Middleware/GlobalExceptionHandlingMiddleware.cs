@@ -66,6 +66,10 @@ public class GlobalExceptionHandlingMiddleware
             ValidationException ex => HandleValidationExceptionAsync(httpContext, ex),
             NotFoundException ex => HandleNotFoundExceptionAsync(httpContext, ex),
             NoAvailableSeatsException ex => HandleNoAvailableSeatsExceptionAsync(httpContext, ex),
+            TooManyActiveBookingsException ex => HandleTooManyActiveBookingsExceptionAsync(httpContext, ex),
+            BookingPastEventException ex => HandleBookingPastEventExceptionAsync(httpContext, ex),
+            ForbiddenException ex => HandleForbiddenExceptionAsync(httpContext, ex),
+            InvalidCredentialsException ex => HandleInvalidCredentialsExceptionAsync(httpContext, ex),
             _ => HandleInternalServerErrorAsync(httpContext)
         });
     }
@@ -161,6 +165,104 @@ public class GlobalExceptionHandlingMiddleware
 
         await WriteProblemDetailsAsync(context, details);
     }
+
+    /// <summary>
+    /// Обрабатывает <see cref="TooManyActiveBookingsException"/>, возвращая 409 Conflict.
+    /// </summary>
+    /// <param name="context">Контекст HTTP-запроса.</param>
+    /// <param name="ex">Исключение с сообщением о превышении лимита бронирований.</param>
+    private async Task HandleTooManyActiveBookingsExceptionAsync(HttpContext context, TooManyActiveBookingsException ex)
+    {
+        _logger.LogWarning(
+            "Превышен лимит активных бронирований. Method={Method}, Path={Path}, Message={Message}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            ex.Message,
+            context.Request.Headers["x-request-id"].ToString());
+
+        var details = new ProblemDetails
+        {
+            Title = "Превышен лимит активных бронирований",
+            Status = 409, // Возвращаем 409 Conflict
+            Detail = ex.Message,
+            Instance = context.Request.Path
+        };
+
+        await WriteProblemDetailsAsync(context, details);
+    }
+
+    /// <summary>
+    /// Обрабатывает <see cref="BookingPastEventException"/>, возвращая 400 Bad Request.
+    /// </summary>
+    /// <param name="context">Контекст HTTP-запроса.</param>
+    /// <param name="ex">Исключение с сообщением о попытке работы с прошедшим событием.</param>
+    private async Task HandleBookingPastEventExceptionAsync(HttpContext context, BookingPastEventException ex)
+    {
+        _logger.LogWarning(
+            "Попытка взаимодействия с прошедшим событием. Method={Method}, Path={Path}, Message={Message}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            ex.Message,
+            context.Request.Headers["x-request-id"].ToString());
+
+        var details = new ProblemDetails
+        {
+            Title = "Ошибка взаимодействия с событием",
+            Status = 400, // Возвращаем 400 Bad Request
+            Detail = ex.Message,
+            Instance = context.Request.Path
+        };
+
+        await WriteProblemDetailsAsync(context, details);
+    }
+
+    /// <summary>
+    /// Обрабатывает <see cref="ForbiddenException"/>, возвращая 403 Forbidden.
+    /// </summary>
+    private async Task HandleForbiddenExceptionAsync(HttpContext context, ForbiddenException ex)
+    {
+        _logger.LogWarning(
+            "Доступ запрещен. Method={Method}, Path={Path}, Message={Message}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            ex.Message,
+            context.Request.Headers["x-request-id"].ToString());
+
+        var details = new ProblemDetails
+        {
+            Title = "Доступ запрещен",
+            Status = 403, // Возвращаем 403 Forbidden
+            Detail = ex.Message,
+            Instance = context.Request.Path
+        };
+
+        await WriteProblemDetailsAsync(context, details);
+    }
+
+    /// <summary>
+    /// Обрабатывает <see cref="InvalidCredentialsException"/>, возвращая 401 Unauthorized.
+    /// </summary>
+    private async Task HandleInvalidCredentialsExceptionAsync(HttpContext context, InvalidCredentialsException ex)
+    {
+        _logger.LogWarning(
+            "Доступ запрещен. Method={Method}, Path={Path}, Message={Message}, RequestId={RequestId}",
+            context.Request.Method,
+            context.Request.Path,
+            ex.Message,
+            context.Request.Headers["x-request-id"].ToString());
+
+        var details = new ProblemDetails
+        {
+            Title = "Доступ запрещен",
+            Status = 401, // Возвращаем 401 Unauthorized
+            Detail = ex.Message,
+            Instance = context.Request.Path
+        };
+
+        await WriteProblemDetailsAsync(context, details);
+    }
+
+
 
     /// <summary>
     /// Обрабатывает необработанные исключения, возвращая 500.

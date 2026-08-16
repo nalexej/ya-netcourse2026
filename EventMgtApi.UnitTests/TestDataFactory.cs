@@ -29,14 +29,14 @@ public static class TestDataFactory
         return @event;
     }
 
-    public static Booking CreateBooking(Guid eventId, BookingStatus status = BookingStatus.Pending)
+    public static Booking CreateBooking(Guid eventId, Guid userId = default, BookingStatus status = BookingStatus.Pending)
     {
-        return new Booking(eventId)
+        return new Booking(eventId, userId)
         {
             Status = status,
             ProcessedAt = status switch
             {
-                BookingStatus.Confirmed or BookingStatus.Rejected => DateTime.UtcNow,
+                BookingStatus.Confirmed or BookingStatus.Cancelled or BookingStatus.Rejected => DateTime.UtcNow,
                 _ => null
             }
         };

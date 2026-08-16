@@ -1,4 +1,4 @@
-﻿using EventMgtApi.Domain.Enums;
+using EventMgtApi.Domain.Enums;
 using System;
 using System.Text.Json.Serialization;
 
@@ -18,6 +18,11 @@ public class BookingResponseDto
     /// Идентификатор события.
     /// </summary>
     public Guid EventId { get; set; }
+
+    /// <summary>
+    /// Идентификатор пользователя, создавшего бронь.
+    /// </summary>
+    public Guid UserId { get; set; }
 
     /// <summary>
     /// Текущий статус брони.

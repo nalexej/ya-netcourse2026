@@ -1,4 +1,5 @@
-﻿using EventMgtApi.Domain.Enums;
+using EventMgtApi.Domain.Enums;
+using EventMgtApi.Domain.Exceptions;
 using System;
 
 namespace EventMgtApi.Domain.Entities;
@@ -22,6 +23,11 @@ public class Booking
     public Guid EventId { get; set; }
 
     /// <summary>
+    /// Идентификатор пользователя, создавшего бронь.
+    /// </summary>
+    public Guid UserId { get; set; }
+
+    /// <summary>
     /// Текущий статус брони.
     /// </summary>
     public BookingStatus Status { get; set; } = BookingStatus.Pending;
@@ -37,24 +43,31 @@ public class Booking
     public DateTime? ProcessedAt { get; set; }
 
     /// <summary>
-    /// Навигационное свойство: ссылка на связанное событие 
+    /// Навигационное свойство: ссылка на связанное событие.
     /// </summary>
     public Event? Event { get; private set; } = null!;
+
+    /// <summary>
+    /// Навигационное свойство: ссылка на пользователя, создавшего бронь.
+    /// </summary>
+    public User? User { get; private set; } = null!;
 
     #endregion
 
     #region Constructors
 
-    // Приватный конструктор без параметров для ORM 
+    // Приватный конструктор без параметров для ORM
     private Booking() { }
 
     /// <summary>
     /// Создаёт новую бронь с начальными значениями: Pending, Id, CreatedAt.
     /// </summary>
     /// <param name="eventId">Идентификатор события, для которого создаётся бронь.</param>
-    public Booking(Guid eventId)
+    /// <param name="userId">Идентификатор пользователя, создающего бронь.</param>
+    public Booking(Guid eventId, Guid userId)
     {
         EventId = eventId;
+        UserId = userId;
     }
 
     #endregion
@@ -76,6 +89,30 @@ public class Booking
     public void Reject()
     {
         Status = BookingStatus.Rejected;
+        ProcessedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Отменяет бронь, переводя её в статус Cancelled.
+    /// Бронь можно отменить только если она в статусах Pending либо Confirmed.
+    /// Повторная отмена уже отменённой брони вызывает исключение.
+    /// </summary>
+    /// <exception cref="ValidationException">Если бронь уже имеет статус Cancelled.</exception>
+    public void Cancel()
+    {
+        if (Status == BookingStatus.Cancelled)
+            throw new ValidationException(new Dictionary<string, ICollection<string>>
+            {
+                ["Status"] = ["Бронь уже отменена."]
+            });
+
+        if (Status is not (BookingStatus.Pending or BookingStatus.Confirmed))
+            throw new ValidationException(new Dictionary<string, ICollection<string>>
+            {
+                ["Status"] = ["Бронь можно отменить только в статусах Pending или Confirmed."]
+            });
+
+        Status = BookingStatus.Cancelled;
         ProcessedAt = DateTime.UtcNow;
     }
 

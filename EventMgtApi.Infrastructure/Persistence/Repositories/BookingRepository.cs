@@ -1,4 +1,4 @@
-﻿using EventMgtApi.Application.Interfaces;
+﻿using EventMgtApi.Application.Abstractions.Persistence.Repositories;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using EventMgtApi.Infrastructure.Persistence;
@@ -50,7 +50,9 @@ namespace EventMgtApi.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task<Booking?> GetByIdAsync(Guid id, CancellationToken ct = default)
         {
-            return await _context.Bookings.FirstOrDefaultAsync(e => e.Id == id, ct);
+            return await _context.Bookings
+                .Include(b => b.Event)
+                .FirstOrDefaultAsync(e => e.Id == id, ct);
         }
 
         /// <inheritdoc />
@@ -68,6 +70,13 @@ namespace EventMgtApi.Infrastructure.Repositories
                     .Select(b => b.Id)
                     .ToListAsync(ct);
             return bookingsIds;
+        }
+
+        /// <inheritdoc />
+        public async Task<int> GetActiveBookingsCountAsync(Guid userId, CancellationToken ct = default)
+        {
+            return await _context.Bookings
+                .CountAsync(b => b.UserId == userId && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed), ct);
         }
 
         /// <inheritdoc />

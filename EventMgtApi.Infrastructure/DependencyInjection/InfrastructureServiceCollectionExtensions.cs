@@ -1,7 +1,10 @@
-﻿using EventMgtApi.Application.Interfaces;
+using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Application.Abstractions.Persistence.Repositories;
+using EventMgtApi.Domain.Options;
 using EventMgtApi.Infrastructure.BackgroundServices;
 using EventMgtApi.Infrastructure.Persistence;
 using EventMgtApi.Infrastructure.Repositories;
+using EventMgtApi.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +18,7 @@ namespace EventMgtApi.Infrastructure.DependencyInjection
             // Регистрация репозиториев
             services.AddScoped<IEventRepository, EventRepository>();
             services.AddScoped<IBookingRepository, BookingRepository>();
+            services.AddScoped<IUserRepository, UserRepository>();
 
             // Регистрация DbContext
             services.AddDbContext<AppDbContext>(options =>
@@ -22,6 +26,14 @@ namespace EventMgtApi.Infrastructure.DependencyInjection
 
             // Регистрация фонового сервиса
             services.AddHostedService<BookingProcessingBackgroundService>();
+
+            // Регистрация хеширования паролей
+            services.AddScoped<IPasswordHasher, PasswordHasher>();
+
+            // Регистрация JWT-параметров и сервиса
+            var jwtSection = configuration.GetSection(JwtOptions.SectionName);
+            services.Configure<JwtOptions>(options => jwtSection.Bind(options));
+            services.AddScoped<IJwtTokenService, JwtTokenService>();
 
             return services;
         }

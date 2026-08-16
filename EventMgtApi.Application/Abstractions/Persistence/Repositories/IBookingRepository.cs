@@ -1,7 +1,7 @@
 ﻿using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 
-namespace EventMgtApi.Application.Interfaces;
+namespace EventMgtApi.Application.Abstractions.Persistence.Repositories;
 
 /// <summary>
 /// Интерфейс репозитория для управления бронированиями.
@@ -45,6 +45,11 @@ public interface IBookingRepository
     /// <param name="ct">Токен отмены.</param>
     /// <returns>Список индентификаторов броней, ожидающих обработки.</returns>
     Task<IEnumerable<Guid>> GetPendingBookingsIdsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Асинхронно получает количество активных бронирований для указанного пользователя.
+    /// </summary>
+    Task<int> GetActiveBookingsCountAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Асинхронно добавляет новую бронь.

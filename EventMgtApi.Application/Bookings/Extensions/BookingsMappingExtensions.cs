@@ -1,4 +1,4 @@
-﻿using EventMgtApi.Application.DTOs;
+using EventMgtApi.Application.DTOs;
 using EventMgtApi.Domain.Entities;
 
 namespace EventMgtApi.Application.Extensions;
@@ -21,6 +21,7 @@ public static class BookingsMappingExtensions
         {
             Id = bookingEntity.Id,
             EventId = bookingEntity.EventId,
+            UserId = bookingEntity.UserId,
             Status = bookingEntity.Status,
             CreatedAt = bookingEntity.CreatedAt,
             ProcessedAt = bookingEntity.ProcessedAt

@@ -58,6 +58,11 @@ namespace EventMgtApi.Infrastructure.Persistence.Configurations
                 .HasColumnName("available_seats")
                 .IsRequired();
 
+            // Маркер версии строки для оптимистичного контроля параллелизма
+            builder.Property(e => e.RowVersion)
+                .HasColumnName("row_version")
+                .IsRowVersion();
+
             // Связь "один ко многим" с бронированиями:
             // одно событие → множество бронирований
             builder.HasMany(e => e.Bookings)

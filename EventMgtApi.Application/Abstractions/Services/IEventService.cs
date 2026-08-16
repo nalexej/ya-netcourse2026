@@ -1,7 +1,7 @@
 ﻿using EventMgtApi.Application.DTOs;
 using EventMgtApi.Domain.Exceptions;
 
-namespace EventMgtApi.Application.Services;
+namespace EventMgtApi.Application.Abstractions.Services;
 
 /// <summary>
 /// Интерфейс для сервиса управления событиями.

@@ -49,11 +49,21 @@ namespace EventMgtApi.Infrastructure.Persistence.Configurations
             builder.Property(b => b.ProcessedAt)
                 .HasColumnName("processed_at");
 
+            builder.Property(b => b.UserId)
+                .HasColumnName("user_id");
+
             // Связь "многие к одному" с событием:
             // каждое бронирование относится к одному событию
             builder.HasOne(b => b.Event)
                 .WithMany(e => e.Bookings)
                 .HasForeignKey(b => b.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Связь "многие к одному" с пользователем:
+            // каждое бронирование относится к одному пользователю
+            builder.HasOne(b => b.User)
+                .WithMany(u => u.Bookings)
+                .HasForeignKey(b => b.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

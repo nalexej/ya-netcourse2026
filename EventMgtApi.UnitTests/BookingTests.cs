@@ -14,7 +14,8 @@ public class BookingTests
     public void Confirm_SetsStatusToConfirmed(BookingStatus initialState)
     {
         // Arrange
-        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), initialState);
+        var userId = Guid.NewGuid();
+        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), userId, initialState);
 
         // Act
         booking.Confirm();
@@ -34,7 +35,8 @@ public class BookingTests
     public void Reject_SetsStatusToRejected(BookingStatus initialState)
     {
         // Arrange
-        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), initialState);
+        var userId = Guid.NewGuid();
+        var booking = TestDataFactory.CreateBooking(Guid.NewGuid(), userId, initialState);
 
         // Act
         booking.Reject();

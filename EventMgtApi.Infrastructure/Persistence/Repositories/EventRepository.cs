@@ -1,6 +1,7 @@
 ﻿using EventMgtApi.Application.DTOs;
-using EventMgtApi.Application.Interfaces;
+using EventMgtApi.Application.Abstractions.Persistence.Repositories;
 using EventMgtApi.Domain.Entities;
+using EventMgtApi.Domain.Exceptions;
 using EventMgtApi.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -92,6 +93,55 @@ namespace EventMgtApi.Infrastructure.Repositories
         public async Task<Event?> GetByIdAsync(Guid id, CancellationToken ct = default)
         {
             return await _context.Events.FirstOrDefaultAsync(e => e.Id == id, ct);
+        }
+
+        /// <inheritdoc />
+        public async Task<T> ExecuteWithConcurrencyRetryAsync<T>(
+            Func<Task<T>> operation,
+            int maxRetries = 3,
+            CancellationToken ct = default)
+        {
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync(ct);
+
+                try
+                {
+                    var result = await operation();
+                    await transaction.CommitAsync(ct);
+                    return result;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    await transaction.RollbackAsync(ct);
+                    if (attempt == maxRetries - 1)
+                        throw; // последняя попытка — пробрасываем
+                               // иначе — retry
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(ct);
+                    throw; // любое другое исключение — сразу наружу
+                }
+            }
+
+            // Все retry исчерпаны — мест больше нет (или они были заняты другими)
+            throw new NoAvailableSeatsException("Нет доступных мест для данного события.");
+        }
+
+        /// <inheritdoc />
+        public async Task<Event?> GetWithLockAsync(Guid id, CancellationToken ct = default)
+        {
+            var sql = @"SELECT ""id"", ""title"", ""description"", ""start_at"", ""end_at"", ""total_seats"", ""available_seats"", ""row_version""
+                        FROM ""events""
+                        WHERE ""id"" = {0}
+                        FOR UPDATE";
+
+            var eventEntity = await _context.Events
+                .FromSqlRaw(sql, id)
+                .FirstOrDefaultAsync(ct);
+
+            return eventEntity;
         }
 
         /// <inheritdoc />

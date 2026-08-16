@@ -26,6 +26,11 @@ namespace EventMgtApi.Infrastructure.Persistence
         public DbSet<Booking> Bookings => Set<Booking>();
 
         /// <summary>
+        /// Набор сущностей пользователей (<see cref="Booking"/>).
+        /// </summary>
+        public DbSet<User> Users => Set<User>();
+
+        /// <summary>
         /// Выполняется при настройке модели моделирования (Model Builder).
         /// Загружает все конфигурации сущностей из текущей сборки.
         /// </summary>

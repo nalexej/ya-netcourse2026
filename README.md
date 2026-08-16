@@ -30,22 +30,106 @@
 
 API предоставляет полный цикл операций **CRUD**:
 
+События:
 - ✅ Получить список всех событий (`GET /api/events`)
 - ✅ Получить событие по ID (`GET /api/events/{id}`)
 - ✅ Добавить новое событие (`POST /api/events`)
 - ✅ Обновить существующее (`PUT /api/events/{id}`)
 - ✅ Удалить событие (`DELETE /api/events/{id}`)
 
-А также:
+Брони:
 - ✅ Создать бронь на событие (`POST /api/events/{id}/book`)
 - ✅ Проверить статус брони (`GET /api/bookings/{id}`)
+- ✅ Отменить бронь (`DELETE /api/bookings/{id}`)
+
+Пользователи:
+- ✅ Зарегистрировать нового пользователя (`POST /api/auth/register`)
+- ✅ Аутентифицировать пользователя (`POST /api/auth/login`)
 
 С поддержкой:
-- Валидации входных данных,
-- Понятных ошибок на русском языке,
-- Корректных HTTP-статусов (200, 201, 202, 400, 404, 409 и др.),
-- Фоновой обработки броней,
-- **Защиты от овербукинга** (ограничение по TotalSeats и AvailableSeats).
+- Валидации входных данных
+- Понятных ошибок на русском языке
+- Корректных HTTP-статусов (200, 201, 202, 400, 404, 409 и др.)
+- Фоновой обработки броней
+- **Защиты от овербукинга** (ограничение по TotalSeats и AvailableSeats)
+- **Ролевого доступа** (User/Admin).
+
+---
+
+## 🎭 Ролевая модель и разграничение прав
+
+Система поддерживает два уровня доступа (роли), определенные в перечислении `UserRole`:
+
+### 1. User (Пользователь)
+Базовая роль для всех зарегистрированных пользователей.
+
+**Права:**
+*   **Просмотр событий:** Доступ к публичному списку событий и деталям событий (`GET /events`).
+*   **Бронирование:** Возможность создавать бронирования на доступные события (`POST /bookings`).
+    *   Подвергается проверке на лимит активных броней (по умолчанию не более 10 активных броней на пользователя).
+    *   Нельзя бронировать прошедшие события.
+*   **Управление своими бронями:**
+    *   Просмотр списка своих бронирований (`GET /bookings`).
+    *   Отмена своей брони (`DELETE /bookings/{id}`), если событие еще не началось.
+*   **Регистрация и Вход:** Использование endpoints аутентификации.
+
+**Ограничения:**
+*   Не может редактировать или удалять чужие бронирования.
+*   Не может создавать, редактировать или удалять события.
+
+### 2. Admin (Администратор)
+Привилегированная роль для администраторов системы.
+
+**Права:**
+*   **Все права пользователя** (включая просмотр и бронирование событий).
+*   **Управление событиями:**
+    *   Создание событий (`POST /events`).
+    *   Редактирование существующих событий (`PUT /events/{id}`).
+    *   Удаление событий (`DELETE /events/{id}`).
+*   **Управление бронированиями:**
+    *   Просмотр всех бронирований в системе.
+    *   Отмена любой брони (`DELETE /bookings/{id}`).
+
+**Примечание по безопасности:**
+Все административные endpoints помечены атрибутами авторизации, требующими роль `Admin`. Попытка выполнения действий от имени `User` на этих endpoint'ах приведет к ответу `403 Forbidden`.
+
+### Инициализация администратора
+
+По умолчанию при создании нового пользователя ему назначается роль `User`. 
+
+В системе реализован механизм начального заполнения базы данных (seed). 
+При запуске приложения автоматически создаются администраторы, указанные в конфигурации.
+
+#### Настройка seed-пользователей
+
+Логины и пароли администраторов хранятся в `appsettings.Development.json` (этот файл не попадает в git).
+
+**`appsettings.Development.json` (не коммитится):**
+```json
+{
+  "SeedOptions": {
+    "Admins": [
+      { "Login": "admin", "Password": "admin1" },
+      { "Login": "superuser", "Password": "Super123!" }
+    ]
+  }
+}
+```
+ 
+В `appsettings.json` массив **Admins** пустой, в целях безопасности.
+
+**`appsettings.json` (коммитится):**
+```json
+{
+  "SeedOptions": {
+    "Admins": []
+  }
+}
+```
+
+> ⚠️ appsettings.Development.json уже добавлен в .gitignore.
+> Если вы хотите изменить список администраторов или их пароли — редактируйте только appsettings.Development.json.
+> Cоздайте данный файл в корневой папке проекта EventMgtApi.Web, взяв за основу appsettings.json, и заполните нужными значениями.
 
 ---
 
@@ -76,6 +160,7 @@ API предоставляет полный цикл операций **CRUD**:
 - **Swagger UI** — документация API
 - **XML-документация** — для IntelliSense и Swagger
 - **Фоновые службы** — обработка броней
+- **JWT-токены** — аутентификация пользователей и управление доступом к эндпоинтам API
 
 ---
 
@@ -84,30 +169,49 @@ API предоставляет полный цикл операций **CRUD**:
 ### Предварительные требования
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **PostgreSQL 14+** (локально или в Docker)
-> 💡 Для разработки и тестирования по умолчанию используется **In-Memory database** — данные хранятся только в памяти и теряются при перезапуске.  
-> Для полноценной работы (включая фоновые сервисы) рекомендуется использовать PostgreSQL.
-
+- **[Docker](https://www.docker.com/)** (для быстрого запуска PostgreSQL через `docker compose up -d`)
 ---
+
 
 ### Настройка PostgreSQL
 
 Сервер PostgreSQL может быть запущен локально или в Docker.
 
-#### Создайте базу данных:
+#### Запуск PostgreSQL через Docker (рекомендуется)
+
+Проще всего запустить PostgreSQL с помощью `docker compose`:
 
 ```bash
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE eventapi;"
+docker compose up -d
+```
+Это запустит контейнер с PostgreSQL по умолчанию:
+
+| Параметр   |   Значение  |
+|------------|-------------|
+| Host       | `localhost` |
+| Port       | `5432`      |
+| Database   | `eventapi`  |
+| Username   | `postgres`  |
+| Password   | `postgres`  |
+
+#### Создайте базу данных (ручной способ):
+
+
+```bash
+PGPASSWORD={YOUR_PASSWORD} psql -h localhost -p 5432 -U {YOUR_USER} -c "CREATE DATABASE eventapi;"
 ```
 
-#### Добавьте строку подключения в appsettings.json:
+#### Добавьте строку подключения в appsettings.Development.json:
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username=postgres;Password=postgres"
+    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi;Username={YOUR_USER};Password={YOUR_PASSWORD}"
   }
 } 
 ```
+На стенде разработки секреты хранятся в appsettings.Development.json - создайте данный файл в корневой папке проекта EventMgtApi.Web, взяв за основу appsettings.json, и заполните недостаюшими значениями.
+
 
 #### 🧱 Миграции с Entity Framework Core
 
@@ -118,11 +222,12 @@ PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE ev
 После изменения модели (`AppDbContext`, сущностей и т.п.) создайте новую миграцию:
 
 ```bash
-dotnet ef migrations add <Название_миграции>
+dotnet ef migrations add <Название_миграции> --project EventMgtApi.Infrastructure --startup-project EventMgtApi.Web
 ```
 
 ##### Применение миграций
 В момент запуска приложение автоматически применяет миграции к базе данных
+
 Для ручного применения миграций используйте команду:
 
 ```bash
@@ -150,6 +255,100 @@ dotnet run --project EventMgtApi.Web/EventMgtApi.Web.csproj --urls "https://loca
 |----------------|--------------------------------|
 | API            | https://localhost:7001         |
 | Swagger UI     | https://localhost:7001/swagger |
+
+---
+
+## 🔐 Получение JWT-токена через Swagger
+
+Для работы с защищёнными эндпоинтами (создание событий, бронирование и т.д.) необходима аутентификация через JWT-токен.
+
+### Шаг 1. Зарегистрируйте пользователя
+
+В Swagger UI откройте эндпоинт `POST /api/auth/register`:
+
+1. Нажмите кнопку **Try it out**
+2. В поле **Request body** введите JSON:
+
+   ```json
+   {
+     "login": "User1",
+     "password": "User1234!"
+   }
+   ```
+
+💡 Доступные роли: User. 
+Для создания администратора - см. раздел **Инициализация администратора**
+
+3. Нажмите Execute — ответ **201 Created** означает успешную регистрацию.
+
+### Шаг 2. Войдите в систему
+
+Откройте эндпоинт POST /api/auth/login:
+
+1. Нажмите кнопку **Try it out**
+2. Введите данные:
+
+   ```json 
+   {
+     "login": "MyUserName",
+     "password": "pass123"
+   }
+   ```
+
+3. Нажмите Execute — вы получите ответ:
+
+   ```json 
+   {
+     "token": "eyJhbGciOiJIUzI1NiIs...",
+     "login": "MyUserName"
+	 "role": "User"
+   }
+   ```
+### Шаг 3. Скопируйте токен
+
+В ответе скопируйте значение поля token.
+
+### Шаг 4.  Авторизуйтесь через Swagger
+
+1. В правом верхнем углу Swagger UI нажмите кнопку **🔒 Authorize**
+
+2. В поле Value введите токен в формате:
+ 
+   ```json 
+   eyJhbGciOiJIUzI1NiIs...
+   ```
+
+3. Нажмите **Authorize**, затем Close.
+
+Теперь все защищённые эндпоинты станут доступны.
+
+### Шаг 5.  Проверка доступа
+
+1. Откройте защищенный эндпоинт GET /api/Events/{id}.
+
+    *  Рядом с методом должен появиться закрытый замок 🔒.
+    *  Нажмите **Try it out**, введите любой ID события и нажмите **Execute**.
+	*  Вы должны получить данные (200 OK), а не ошибку 401 Unauthorized.
+
+2. Проверьте права администратора:
+
+	*  Откройте метод POST /api/Events (Создание события).
+	*  В теле запроса передайте объект:
+
+   ```json 
+   {
+	  "title": "Тестовый концерт",
+	  "startAt": "2026-08-10T19:00:00Z",
+	  "endAt": "2026-08-10T22:00:00Z",
+	  "totalSeats": 150
+   }
+   ```
+Если токен имеет роль Admin, вернется ответ 201 Created. Если роль User — придет ошибка 403 Forbidden.
+
+> 💡 **Важные нюансы работы с JWT в Swagger**
+> 	*  Срок действия: Токены обычно живут недолго (например, 20–30 минут). Если запросы внезапно начали возвращать 401, просто повторите Шаг 2 (Login) и обновите токен в кнопке Authorize.
+> 	*  Копирование токена: При копировании из поля ответа убедитесь, что захватили строку целиком, от eyJ... до последней точки включительно, но без кавычек JSON.
+> 	*  Очистка прав: Чтобы выйти из аккаунта в Swagger, нажмите кнопку Authorize снова и нажмите Logout (или очистите поле Value). Замки на методах снова станут серыми.
 
 ---
 
@@ -238,7 +437,7 @@ API возвращает ошибки в стандартизированном 
 Создаёт новую бронь на указанное событие.  
 Бронь изначально имеет статус `Pending`.
 
-> **HTTP 202 Accepted** — бронь принята в обработку  
+> **HTTP 201 Created** — бронь создана и принята в обработку  
 > **HTTP 409 Conflict** — отсутствуют свободные места (овербукинг)  
 > **Location** — ссылка на `GET /api/bookings/{id}`
 
@@ -256,7 +455,7 @@ Content-Type: application/json
 
 #### Успешный ответ:
 ```http
-HTTP/1.1 202 Accepted
+HTTP/1.1 201 Accepted
 Location: https://localhost:7001/api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
 ```
 
@@ -293,6 +492,8 @@ HTTP/1.1 409 Conflict
 Возвращает текущий статус брони по её идентификатору.
 
 > **HTTP 200 OK** — бронь найдена  
+> **HTTP 400 Bad Request** — некорректный формат идентификатора  
+> **HTTP 401 Unauthorized** — требуется аутентификация  
 > **HTTP 404 Not Found** — бронь не существует
 
 #### Пример запроса:
@@ -311,6 +512,85 @@ GET /api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
 }
 ```
 
+### 🔍 Отмена брони: `DELETE /api/bookings/{id:guid}`
+
+Переводит бронь в статус **Cancelled**
+
+> **HTTP 204 No Content** — бронь отменена  
+> **HTTP 400 Bad Request** — ошибка отмены брони  
+> **HTTP 401 Unauthorized** — требуется аутентификация  
+> **HTTP 403 Forbidden** — недостаточно прав для отмены брони  
+> **HTTP 404 Not Found** — бронь не существует
+
+
+### 🔍 Регистрация нового пользователя: `POST /api/auth/register`
+
+Регистрирует нового пользователя
+
+> **HTTP 201 Created** — пользователь зарегистрирован  
+> **HTTP 400 Bad Request** — ошибка регистрации пользователя  
+
+#### Пример запроса:
+```http
+POST /api/auth/register
+
+{
+  "login": "MyUserLogin",
+  "password": "Mypwd123!"
+}
+```
+
+#### Пример тела ответа при успешной регистрации:
+```json
+{
+  "userId": "ad971e06-e7cb-4c28-a4cc-1edd34586614",
+  "login": "string88",
+  "role": "User"
+}
+```
+
+#### Пример тела ответа при ошибке регистрации:
+```json
+{
+  "title": "Ошибка валидации",
+  "status": 400,
+  "detail": "Обнаружены ошибки валидации входных данных.",
+  "instance": "/api/Auth/register",
+  "errors": {
+    "Login": [
+      "Пользователь с таким логином уже существует."
+    ]
+  }
+}
+```
+
+### 🔍 Аутентификация пользователя: `POST /api/auth/login`
+
+Аутентифицирует пользователя
+
+> **HTTP 200 OK** — пользователь аутентифицирован  
+> **HTTP 400 Bad Request** — ошибка аутентификации  
+> **HTTP 404 Not Found** — пользователь не найден
+
+#### Пример запроса:
+```http
+POST /api/auth/login
+
+{
+  "login": "MyUserName",
+  "password": "pass123"
+}
+```
+
+#### Ответ:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cC...",
+  "login": "MyUserName",
+  "role": "User"
+}
+```
+
 ---
 
 ## 🧩 Модель `Booking` и статусы
@@ -318,6 +598,7 @@ GET /api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
 ### `Booking` — модель бронирования
 - `Id`: `Guid` — уникальный идентификатор брони
 - `EventId`: `Guid` — ссылка на событие
+- `UserId`: `Guid` — ссылка на пользователя
 - `Status`: `BookingStatus` — текущий статус (см. ниже)
 - `CreatedAt`: `DateTime` — когда создана
 - `ProcessedAt`: `DateTime?` — когда обработана (может быть `null`)
@@ -333,7 +614,10 @@ public enum BookingStatus
     Confirmed,
 
     /// <summary>Бронь отклонена.</summary>
-    Rejected
+    Rejected,
+	
+    /// <summary>Бронь отменена.</summary>
+    Cancelled
 }
 ```
 
@@ -426,13 +710,13 @@ POST /api/events/event-id/book
    - Проверяет: `AvailableSeats == 2` → OK
    - Уменьшает: `AvailableSeats = 1`
    - Создаёт бронь со статусом `Pending`
-   - Возвращает `202 Accepted`
+   - Возвращает `201 Created`
 
 2. **Запрос 2** ждёт, затем заходит в критическую секцию:
    - Проверяет: `AvailableSeats == 1` → OK
    - Уменьшает: `AvailableSeats = 0`
    - Создаёт бронь со статусом `Pending`
-   - Возвращает `202 Accepted`
+   - Возвращает `201 Created`
 
 3. **Запрос 3** ждёт, затем заходит в критическую секцию:
    - Проверяет: `AvailableSeats == 0` → ❌
@@ -462,12 +746,16 @@ EventMgtService.sln
 │   ├── Entities/
 │   │   ├── Event.cs             # Модель события (с TotalSeats, AvailableSeats)
 │   │   └── Booking.cs           # Модель бронирования
+│   │   └── User.cs           # Модель пользователя
 │   ├── Enums/
 │   │   └── BookingStatus.cs     # Статусы брони: Pending, Confirmed, Rejected
 │   ├── Exceptions/
+│       ├── BookingPastEventException.cs # Ошибка отмены бронирования прошедшего события (400)
+│       ├── ForbiddenException.cs # Ошибка недостаточности прав доступа (403)
+│       ├── NoAvailableSeatsException # Ошибка овербукинга (409)
 │       ├── NotFoundException.cs # Ошибка "не найдено" (404)
-│       ├── ValidationException.cs # Ошибка валидации (400)
-│       └── NoAvailableSeatsException.cs # Ошибка овербукинга (409)
+│       ├── TooManyActiveBookingsException.cs # Превышен лимит активных броней пользователя (409)
+│       └── ValidationException.cs # Ошибка валидации (400)
 │
 ├── EventMgtApi.Application/      # Логика приложения: сервисы, DTO, маппинг
 │   ├── Abstractions/
@@ -475,9 +763,12 @@ EventMgtService.sln
 │   │   │   ├── Repositories/
 │   │   │       ├── IEventRepository.cs  # Абстракция доступа к событиям
 │   │   │       └── IBookingRepository.cs # Абстракция доступа к броням
+│   │   │       └── IUserRepository.cs # Абстракция доступа к пользователям
 │   │   └── Services/
 │   │       ├── IEventService.cs     # Интерфейс управления событиями
-│   │       └── IBookingService.cs   # Интерфейс управления бронями
+│   │       ├── IBookingService.cs   # Интерфейс управления бронями
+│   │       ├── IUserService.cs   # Интерфейс управления пользователям
+│   │       └── ISeedService.cs   # Интерфейс начальным заполнением БД
 │   ├── Events/
 │   │   ├── EventService.cs      # Реализация бизнес-логики событий
 │   │   ├── DTOs/
@@ -493,6 +784,12 @@ EventMgtService.sln
 │   │   │   └── CreateBookingRequestDto.cs # Пустой DTO для бронирования
 │   │   └── Extensions/
 │   │       └── BookingsMappingExtensions.cs # Метод ToDtoResponse()
+│   ├── Users/
+│   │   ├── UserService.cs      # Реализация бизнес-логики управления пользователями
+│   │   ├── SeedService.cs      # Начальное заполнение БД
+│   │   ├── DTOs/
+│   │       ├── UserDtos.cs          # DTO для регистрации/аутентификации пользователя
+│   │       
 │   └── DependencyInjection/
 │       ├── ApplicationServiceCollectionExtensions.cs    # Регистрация сервисов уровня приложения
 │
@@ -514,11 +811,13 @@ EventMgtService.sln
 ├── EventMgtApi.Web/              # Входная точка API (Presentation Layer)
 │   ├── Controllers/
 │   │   ├── EventsController.cs  # Обработка /api/events
-│   │   └── BookingsController.cs # Обработка /api/bookings
+│   │   ├── BookingsController.cs # Обработка /api/bookings
+│   │   └── AuthController.cs # Обработка /api/auth
 │   ├── Middleware/
 │   │   └── GlobalExceptionHandlingMiddleware.cs # Централизованная обработка ошибок
 │   ├── Filters/
 │   │   └── ThrowValidationExceptionFilter.cs # Преобразует ModelState в исключение
+│   │   └── RemoveAuthForAnonymousOperations.cs # Фильтр операций Swagger
 │   └── Extensions/
 │   │    ├── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
 │   │    └── ServiceCollectionExtensions.cs # Методы регистрации сервисов
@@ -528,6 +827,7 @@ EventMgtService.sln
 ├── EventMgtApi.UnitTests/        # Юнит-тесты
 │   ├── EventServiceTests.cs
 │   ├── BookingServiceTests.cs
+│   ├── UserServiceTests.cs
 │   ├── EventTests.cs
 │   ├── BookingTests.cs
 │   └── TestDataFactory.cs
@@ -569,13 +869,56 @@ EventMgtService.sln
 
 ---
 
+## ⚙️ JWT-конфигурация
+
+Аутентификация основана на JWT-токенах (Bearer). Настройки читаются из конфигурации:
+
+```json
+{
+  "Jwt": {
+    "Secret": "your-secret-key-here",
+    "Issuer": "EventMgtApi",
+    "Audience": "EventMgtApi",
+    "ExpiryMinutes": 60
+  }
+}
+```
+
+> 🔒 Безопасность секрета:
+
+- На стенде разработки секреты хранятся в appsettings.Development.json - создайте данный файл в корневой папке проекта EventMgtApi.Web, взяв за основу appsettings.json, и заполните недостаюшими значениями.
+- Для Jwt:Secret используйте любое случайное значение (минимум 32 символа).
+- В продакшене секрет должен задаваться через защищённый источник:
+	- Переменные окружения (не через appsettings.json);
+	- Azure Key Vault, AWS Secrets Manager, HashiCorp Vault;
+
+## ⚙️ Seed-конфигурация
+
+Начальное заполнение базы данных (seed) настраивается через `SeedOptions`. 
+Администраторы создаются автоматически при запуске приложения, после применения миграций БД.
+
+```json
+{
+  "SeedOptions": {
+    "Admins": [
+      { "Login": "admin", "Password": "Admin123!" }
+    ]
+  }
+}
+```
+
+Если пароль не указан, будет выброшено исключение.
+Администраторы с таким логином не создаются повторно.
+
+---
+
 ## 🧱 Тесты
 
 ### Unit-тесты
 
 Реализованы unit-тесты для:
-- сервисов `EventService`, `BookingService`, `BookingProcessingBackgroundService`.
-- сущностей `Event` и `Booking`
+- сервисов `EventService`, `BookingService`, `UserService`, `BookingProcessingBackgroundService`.
+- сущностей `Event`, `Booking` и `User`
 
 Запуск unit-тестов (в корне репозитория):
 
@@ -608,10 +951,10 @@ dotnet test
 
 ---
 
-### 🧱 Ограничения
+### ⚠️ Ограничения
 
-- Нет аутентификации или авторизации.
-- Часовые пояса не обрабатываются.
+- Часовые пояса не обрабатываются (все даты в UTC).
+- Нет поддержки refresh-токенов.
 
 ---
 

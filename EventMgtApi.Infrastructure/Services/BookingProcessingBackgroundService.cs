@@ -1,4 +1,4 @@
-﻿using EventMgtApi.Application.Interfaces;
+﻿using EventMgtApi.Application.Abstractions.Persistence.Repositories;
 using EventMgtApi.Domain.Entities;
 using EventMgtApi.Domain.Enums;
 using Microsoft.Extensions.DependencyInjection;
@@ -91,7 +91,7 @@ public class BookingProcessingBackgroundService : BackgroundService
     /// <param name="bookingId">Идентификатор брони для обработки.</param>
     /// <param name="stoppingToken">Токен отмены.</param>
     /// <returns>Задача, представляющая асинхронную операцию обработки.</returns>
-    private async Task ProcessBookingAsync(Guid bookingId, CancellationToken stoppingToken)
+    protected internal async Task ProcessBookingAsync(Guid bookingId, CancellationToken stoppingToken)
     {
 
         // Имитация внешнего вызова выполняется ДО захвата семафора
@@ -157,9 +157,9 @@ public class BookingProcessingBackgroundService : BackgroundService
                     bkg.Reject();
                     var evt = await eventRepository.GetByIdAsync(bkg.EventId, stoppingToken);
 
-                    if (@evt is not null)
+                    if (evt is not null)
                     {
-                        @evt.ReleaseSeats(_seatsToReleaseOnReject); // возвращаем место
+                        evt.ReleaseSeats(_seatsToReleaseOnReject); // возвращаем место
                         await eventRepository.SaveChangesAsync(stoppingToken);
                     }
                 }

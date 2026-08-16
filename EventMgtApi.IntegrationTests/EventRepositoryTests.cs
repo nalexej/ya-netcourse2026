@@ -25,7 +25,7 @@ public class EventRepositoryTests
         return new AppDbContext(options);
     }
 
-    private async Task ResetDatabaseAsync() 
+    private async Task ResetDatabaseAsync()
     {
         await using var context = CreateContext();
         await context.Database.EnsureDeletedAsync();
