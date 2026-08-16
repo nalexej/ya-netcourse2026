@@ -92,6 +92,33 @@ namespace EventMgtApi.Domain.Entities
             };
         }
 
+        /// <summary>
+        /// Создаёт событие без валидации — исключительно для нужд тестирования.
+        /// Позволяет задать произвольные значения свойств, включая недопустимые с точки зрения бизнес-логики.
+        /// </summary>
+        internal static Event CreateForTest(
+            Guid id,
+            string title,
+            DateTime startAt,
+            DateTime endAt,
+            int totalSeats,
+            int? availableSeats = null,
+            string? description = null,
+            ICollection<Booking>? bookings = null)
+        {
+            return new Event
+            {
+                Id = id,
+                Title = title,
+                Description = description ?? string.Empty,
+                StartAt = startAt,
+                EndAt = endAt,
+                TotalSeats = totalSeats,
+                AvailableSeats = availableSeats ?? totalSeats,
+                Bookings = bookings ?? []
+            };
+        }
+
         #endregion
 
         /// <summary>

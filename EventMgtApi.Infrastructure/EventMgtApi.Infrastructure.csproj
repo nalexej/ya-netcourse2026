@@ -10,8 +10,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-  
-  <ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="EventMgtApi.UnitTests" />
+	</ItemGroup>
+	
+	<ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.4" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.4" />

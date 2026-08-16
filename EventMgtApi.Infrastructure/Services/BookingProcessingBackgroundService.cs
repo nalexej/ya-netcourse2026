@@ -91,7 +91,7 @@ public class BookingProcessingBackgroundService : BackgroundService
     /// <param name="bookingId">Идентификатор брони для обработки.</param>
     /// <param name="stoppingToken">Токен отмены.</param>
     /// <returns>Задача, представляющая асинхронную операцию обработки.</returns>
-    private async Task ProcessBookingAsync(Guid bookingId, CancellationToken stoppingToken)
+    protected internal async Task ProcessBookingAsync(Guid bookingId, CancellationToken stoppingToken)
     {
 
         // Имитация внешнего вызова выполняется ДО захвата семафора

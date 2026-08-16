@@ -12,8 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using System.Reflection;
-
 
 namespace EventMgtApi.Tests;
 
@@ -347,16 +345,12 @@ public class BookingServiceTests
         var eventId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        var constructor = typeof(Event).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)[0];
-        var pastEvent = (Event)constructor.Invoke(new object[] { });
-
-        typeof(Event).GetProperty("Id")!.SetValue(pastEvent, eventId);
-        typeof(Event).GetProperty("Title")!.SetValue(pastEvent, "Past Event");
-        typeof(Event).GetProperty("StartAt")!.SetValue(pastEvent, DateTime.UtcNow.AddHours(-2));
-        typeof(Event).GetProperty("EndAt")!.SetValue(pastEvent, DateTime.UtcNow.AddHours(-1));
-        typeof(Event).GetProperty("TotalSeats")!.SetValue(pastEvent, 10);
-        typeof(Event).GetProperty("AvailableSeats")!.SetValue(pastEvent, 10);
-        typeof(Event).GetProperty("Bookings")!.SetValue(pastEvent, new List<Booking>());
+        var pastEvent = Event.CreateForTest(
+            id: eventId,
+            title: "Past Event",
+            startAt: DateTime.UtcNow.AddHours(-2),
+            endAt: DateTime.UtcNow.AddHours(-1),
+            totalSeats: 10);
 
         _eventRepoMock.Setup(r => r.GetByIdAsync(eventId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(pastEvent);
@@ -695,15 +689,10 @@ public class BookingServiceTests
 
         var logger = new LoggerFactory().CreateLogger<BookingProcessingBackgroundService>();
         var service = new BookingProcessingBackgroundService(mockScopeFactory.Object, logger);
-
-        var method = typeof(BookingProcessingBackgroundService).GetMethod(
-            "ProcessBookingAsync",
-            BindingFlags.NonPublic | BindingFlags.Instance);
+        using var cts = new CancellationTokenSource();
 
         // Act
-        using var cts = new CancellationTokenSource();
-        var task = (Task)method!.Invoke(service, new object[] { bookingId, cts.Token })!;
-        await task;
+         await service.ProcessBookingAsync(bookingId, cts.Token);
 
         // Assert
         // 1. Броня должна быть отклонена
