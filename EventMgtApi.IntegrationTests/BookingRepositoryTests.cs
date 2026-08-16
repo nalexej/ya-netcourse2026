@@ -8,7 +8,7 @@ using Testcontainers.PostgreSql;
 namespace EventMgtApi.IntegrationTests;
 
 [Collection("Database")]
-public class BookingRepositoryTests 
+public class BookingRepositoryTests
 {
     private readonly PostgreSqlContainer _postgres;
 

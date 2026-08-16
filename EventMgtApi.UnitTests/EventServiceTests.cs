@@ -353,7 +353,7 @@ public sealed class EventServiceTests : IDisposable
                 (async () => await _eventService.GetEventAsync(nonExistingId));
 
 
-    Assert.Contains($"Событие с ID {nonExistingId} не найдено", exception.Message);
+        Assert.Contains($"Событие с ID {nonExistingId} не найдено", exception.Message);
     }
 
     // ========================================================================

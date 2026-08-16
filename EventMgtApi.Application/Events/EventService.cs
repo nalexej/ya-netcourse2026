@@ -37,7 +37,7 @@ public sealed class EventService : IEventService
         // Защита от некорректных значений
         page = Math.Max(1, page);
         pageSize = Math.Max(1, Math.Min(100, pageSize)); // Ограничим максимум 100
-        
+
         var result = await _repository.GetFilteredPagesAsync(title, from, to, page, pageSize, cancellationToken);
 
         return new PaginatedResult<EventDtoResponse>
@@ -52,7 +52,7 @@ public sealed class EventService : IEventService
     /// <inheritdoc />
     public async Task<EventDtoResponse> GetEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var eventEntity = await _repository.GetByIdAsync(id, cancellationToken) 
+        var eventEntity = await _repository.GetByIdAsync(id, cancellationToken)
                     ?? throw new NotFoundException($"Событие с ID {id} не найдено.");
         return eventEntity.ToDtoResponse();
     }

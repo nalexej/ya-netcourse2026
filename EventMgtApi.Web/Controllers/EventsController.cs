@@ -20,7 +20,7 @@ namespace EventMgtApi.Web.Controllers;
 public class EventsController : ControllerBase
 {
     private readonly IEventService _eventService;
-    private readonly IBookingService _bookingService; 
+    private readonly IBookingService _bookingService;
 
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="EventsController"/>.

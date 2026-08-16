@@ -55,7 +55,7 @@ namespace EventMgtApi.Domain.Entities
         /// Навигационное свойство: список бронирований.
         /// </summary>
         public ICollection<Booking> Bookings { get; private set; } = [];
- 
+
         #endregion
 
         #region Constructors

@@ -68,8 +68,8 @@ public class GlobalExceptionHandlingMiddleware
             NoAvailableSeatsException ex => HandleNoAvailableSeatsExceptionAsync(httpContext, ex),
             TooManyActiveBookingsException ex => HandleTooManyActiveBookingsExceptionAsync(httpContext, ex),
             BookingPastEventException ex => HandleBookingPastEventExceptionAsync(httpContext, ex),
-            ForbiddenException ex => HandleForbiddenExceptionAsync(httpContext, ex), 
-            InvalidCredentialsException ex => HandleInvalidCredentialsExceptionAsync(httpContext, ex), 
+            ForbiddenException ex => HandleForbiddenExceptionAsync(httpContext, ex),
+            InvalidCredentialsException ex => HandleInvalidCredentialsExceptionAsync(httpContext, ex),
             _ => HandleInternalServerErrorAsync(httpContext)
         });
     }

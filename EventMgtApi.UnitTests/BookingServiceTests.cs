@@ -212,7 +212,7 @@ public class BookingServiceTests
         _bookingRepoMock
             .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        
+
         // Act & Assert — первые 2 брони успешны
         await _service.CreateBookingAsync(@event.Id, Guid.NewGuid());
         await _service.CreateBookingAsync(@event.Id, Guid.NewGuid());
@@ -692,7 +692,7 @@ public class BookingServiceTests
         using var cts = new CancellationTokenSource();
 
         // Act
-         await service.ProcessBookingAsync(bookingId, cts.Token);
+        await service.ProcessBookingAsync(bookingId, cts.Token);
 
         // Assert
         // 1. Броня должна быть отклонена
