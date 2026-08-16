@@ -50,7 +50,9 @@ namespace EventMgtApi.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task<Booking?> GetByIdAsync(Guid id, CancellationToken ct = default)
         {
-            return await _context.Bookings.FirstOrDefaultAsync(e => e.Id == id, ct);
+            return await _context.Bookings
+                .Include(b => b.Event)
+                .FirstOrDefaultAsync(e => e.Id == id, ct);
         }
 
         /// <inheritdoc />
