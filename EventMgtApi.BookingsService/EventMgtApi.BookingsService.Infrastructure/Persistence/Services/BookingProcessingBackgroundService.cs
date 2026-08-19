@@ -128,7 +128,7 @@ public class BookingProcessingBackgroundService : BackgroundService
                 bookingId: booking.Id,
                 eventId: booking.EventId,
                 userId: booking.UserId,
-                seatsCount: 1, // сколько мест было забронировано
+                seatsCount: _seatsToReleaseOnReject, // сколько мест было забронировано
                 confirmedAt: booking!.ProcessedAt!.Value
             );
 

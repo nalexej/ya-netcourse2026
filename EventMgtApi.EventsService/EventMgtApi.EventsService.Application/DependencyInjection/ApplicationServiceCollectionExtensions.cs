@@ -1,5 +1,6 @@
 using EventMgtApi.Application.Abstractions.Services;
 using EventMgtApi.EventsService.Application.Services;
+using EventMgtApi.EventsService.Domain.Options;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,7 +17,7 @@ public static class ApplicationServiceCollectionExtensions
         //services.AddScoped<ISeedService, SeedService>();
 
         //services.Configure<BookingOptions>(options => configuration.GetSection("BookingOptions").Bind(options));
-        //services.Configure<SeedOptions>(options => configuration.GetSection("SeedOptions").Bind(options));
+        services.Configure<KafkaConsumerOptions>(options => configuration.GetSection("Kafka").Bind(options));
 
         return services;
     }

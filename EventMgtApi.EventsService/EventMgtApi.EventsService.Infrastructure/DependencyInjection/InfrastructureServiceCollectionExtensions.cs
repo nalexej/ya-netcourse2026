@@ -1,6 +1,7 @@
 using EventMgtApi.EventsService.Application.Persistence;
 using EventMgtApi.EventsService.Infrastructure.Persistence;
 using EventMgtApi.EventsService.Infrastructure.Repositories;
+using EventMgtApi.EventsService.Infrastructure.ServiceInteractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,8 @@ public static class InfrastructureServiceCollectionExtensions
 
         // Регистрация фонового сервиса
         //services.AddHostedService<BookingProcessingBackgroundService>();
+        services.AddHostedService<KafkaConsumerBackgroundService>();
+        services.AddHostedService<KafkaTopicInitializer>();
 
         // Регистрация хеширования паролей
         //services.AddScoped<IPasswordHasher, PasswordHasher>();
