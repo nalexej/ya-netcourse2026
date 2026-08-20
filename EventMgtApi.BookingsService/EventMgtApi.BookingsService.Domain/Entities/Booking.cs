@@ -93,7 +93,7 @@ public class Booking
 
     /// <summary>
     /// Отменяет бронь, переводя её в статус Cancelled.
-    /// Бронь можно отменить только если она в статусах Pending либо Confirmed.
+    /// Бронь можно отменить только, если она в статусе Confirmed.
     /// Повторная отмена уже отменённой брони вызывает исключение.
     /// </summary>
     /// <exception cref="ValidationException">Если бронь уже имеет статус Cancelled.</exception>
@@ -105,10 +105,10 @@ public class Booking
                 ["Status"] = ["Бронь уже отменена."]
             });
 
-        if (Status is not (BookingStatus.Pending or BookingStatus.Confirmed))
+        if (Status is not BookingStatus.Confirmed)
             throw new ValidationException(new Dictionary<string, ICollection<string>>
             {
-                ["Status"] = ["Бронь можно отменить только в статусах Pending или Confirmed."]
+                ["Status"] = ["Бронь можно отменить только в статусе Confirmed."]
             });
 
         Status = BookingStatus.Cancelled;
