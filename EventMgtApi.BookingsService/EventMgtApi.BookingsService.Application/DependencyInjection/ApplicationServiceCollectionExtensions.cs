@@ -1,8 +1,9 @@
 using EventMgtApi.Application.Abstractions.Services;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
+using EventMgtApi.BookingsService.Application.ServiceInteraction;
 using EventMgtApi.BookingsService.Application.Services;
 using EventMgtApi.BookingsService.Domain.Options;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EventMgtApi.BookingsService.Application.DependencyInjection
 {
@@ -17,7 +18,7 @@ namespace EventMgtApi.BookingsService.Application.DependencyInjection
             //services.AddScoped<ISeedService, SeedService>();
 
             services.Configure<BookingOptions>(options => configuration.GetSection("BookingOptions").Bind(options));
-            //services.Configure<SeedOptions>(options => configuration.GetSection("SeedOptions").Bind(options));
+            services.Configure<KafkaOptions>(options => configuration.GetSection("KafkaOptions").Bind(options));
 
             return services;
         }

@@ -1,5 +1,7 @@
 ﻿using EventMgtApi.BookingsService.Application.Persistence;
+using EventMgtApi.BookingsService.Application.ServiceInteraction;
 using EventMgtApi.Contracts.Enums;
+using EventMgtApi.Contracts.ServiceInteraction.ServiceEvents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -119,7 +121,22 @@ public class BookingProcessingBackgroundService : BackgroundService
             await bookingRepository.SaveChangesAsync(stoppingToken);
             _logger.LogDebug("Бронь {BookingId} подтверждена.", booking.Id);
 
-            // ToDo: тут зарезервировать место
+            // Публикуем событие BookingConfirmed
+            var eventPublisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
+
+            var confirmedEvent = new BookingConfirmed(
+                bookingId: booking.Id,
+                eventId: booking.EventId,
+                userId: booking.UserId,
+                seatsCount: 1, // сколько мест было забронировано
+                confirmedAt: booking!.ProcessedAt!.Value
+            );
+
+            await eventPublisher.PublishAsync(
+                confirmedEvent,
+                key: booking.EventId.ToString(), // ключ = EventId для порядка по событию
+                ct: stoppingToken
+            );
 
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
