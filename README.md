@@ -1,109 +1,104 @@
 # Event Management API
 
-Простое RESTful API для управления событиями (мероприятиями).  
-Реализовано на **ASP.NET Core** с использованием **C# 12** (**.NET 10**) и современных практик разработки.
+RESTful API для управления событиями на основе микросервисной архитектуры.
+Создана на базе **ASP.NET Core** с использованием **C# 12** (**.NET 10**) и принципов **чистой архитектуры** (Clean Architecture).
 
-> 🎯 Подходит для обучения, демонстрации или прототипирования микросервисов.
+> 🎯 Три независимых микросервиса, разделяющие проект контрактов, взаимодействующие асинхронно через **Apache Kafka**.
 
 ---
 
-## 📋 Модель события (Event)
+## 📋 Модель события
 
 Каждое событие имеет следующие поля:
 
 | Поле | Тип | Описание |
-|------|-----|----------|
+|------|------|----------|
 | `Id` | `Guid` | Уникальный идентификатор |
 | `Title` | `string` | Название события |
-| `Description` | `string?` | Описание (опционально) |
+| `Description` | `string?` | Описание (необязательно) |
 | `StartAt` | `DateTime` | Дата и время начала |
 | `EndAt` | `DateTime` | Дата и время окончания |
 | `TotalSeats` | `int` | **Общее количество мест** (обязательное, > 0) |
 | `AvailableSeats` | `int` | **Текущее количество доступных мест** |
 
-> 💡 При создании события `AvailableSeats` автоматически устанавливается равным `TotalSeats`.  
-> При успешном бронировании `AvailableSeats` уменьшается на 1 (или больше, если указано).
+> 💡 При создании `AvailableSeats` автоматически устанавливается равным `TotalSeats`.
+> При успешном бронировании `AvailableSeats` уменьшается на 1 (или на указанное значение).
 
 ---
 
-## 📋 Функциональность
+## 📋 Функционал
 
-API предоставляет полный цикл операций **CRUD**:
+API предоставляет полный цикл **CRUD**:
 
-### События:
-- ✅ Получить список всех событий (`GET /api/events`)
+### События (EventsService):
+- ✅ Получить все события (`GET /api/events`)
 - ✅ Получить событие по ID (`GET /api/events/{id}`)
-- ✅ Добавить новое событие (`POST /api/events`)
-- ✅ Обновить существующее (`PUT /api/events/{id}`)
-- ✅ Удалить событие (`DELETE /api/events/{id}`)
+- ✅ Создать новое событие (`POST /api/events`) — **только для Администратора**
+- ✅ Обновить существующее событие (`PUT /api/events/{id}`) — **только для Администратора**
+- ✅ Удалить событие (`DELETE /api/events/{id}`) — **только для Администратора**
 
-### Брони:
-- ✅ Создать бронь на событие (`POST /api/events/{id}/book`)
-- ✅ Проверить статус брони (`GET /api/bookings/{id}`)
-- ✅ Отменить бронь (`DELETE /api/bookings/{id}`)
+### Бронирования (BookingsService):
+- ✅ Создать бронирование на событие (`POST /api/events/{id}/book`)
+- ✅ Проверить статус бронирования (`GET /api/bookings/{id}`)
+- ✅ Отменить бронирование (`DELETE /api/bookings/{id}`)
 
-### Пользователи:
+### Пользователи и авторизация (UsersService):
 - ✅ Зарегистрировать нового пользователя (`POST /api/auth/register`)
 - ✅ Аутентифицировать пользователя (`POST /api/auth/login`)
 
-### С поддержкой:
-- Валидации входных данных
-- Понятных ошибок на русском языке
-- Корректных HTTP-статусов (200, 201, 202, 400, 404, 409 и др.)
-- Фоновой обработки броней
-- **Защиты от овербукинга** (ограничение по TotalSeats и AvailableSeats)
-- **Ролевого доступа** (User/Admin)
-- **Асинхронной межсервисной коммуникации** через **Kafka** (pub/sub)
+### Поддерживаемые возможности:
+- Валидация входных данных с сообщениями об ошибках на русском языке
+- Корректные HTTP-статусы (200, 201, 202, 400, 404, 409 и т.д.)
+- Фоновая обработка бронирований
+- **Защита от овербукинга** (ограничение по `TotalSeats` и `AvailableSeats`)
+- **Доступ на основе ролей** (Пользователь/Администратор)
+- **Асинхронное межсервисное взаимодействие** через **Apache Kafka** (pub/sub)
 
 ---
 
-## 🎭 Ролевая модель и разграничение прав
+## 🎭 Ролевая модель
 
-Система поддерживает два уровня доступа (роли), определенные в перечислении `UserRole`:
+Система поддерживает два уровня доступа,Defined в перечислении `UserRole`:
 
-### 1. User (Пользователь)
-Базовая роль для всех зарегистрированных пользователей.
+### 1. Пользователь (User)
 
 **Права:**
-*   **Просмотр событий:** Доступ к публичному списку событий и деталям событий (`GET /events`).
-*   **Бронирование:** Возможность создавать бронирования на доступные события (`POST /bookings`).
-    *   Подвергается проверке на лимит активных броней (по умолчанию не более 10 активных броней на пользователя).
-    *   Нельзя бронировать прошедшие события.
-*   **Управление своими бронями:**
-    *   Просмотр списка своих бронирований (`GET /bookings`).
-    *   Отмена своей брони (`DELETE /bookings/{id}`), если событие еще не началось.
-*   **Регистрация и Вход:** Использование endpoints аутентификации.
+* **Просмотр событий:** Публичный список и детали (`GET /events`).
+* **Бронирование событий:** Создание бронирований на доступные события (`POST /bookings`).
+  * Подвергается ограничению на количество активных бронирований (по умолчанию: 10 на пользователя).
+  * Нельзя бронировать прошедшие события.
+* **Управление своими бронированиями:**
+  * Просмотр своих бронирований (`GET /bookings`).
+  * Отмена своего бронирования (`DELETE /bookings/{id}`), если событие еще не началось.
+* **Регистрация и вход:** Использование эндпоинтов авторизации.
 
 **Ограничения:**
-*   Не может редактировать или удалять чужие бронирования.
-*   Не может создавать, редактировать или удалять события.
+* Нельзя редактировать или удалять чужие бронирования.
+* Нельзя создавать, редактировать или удалять события.
 
-### 2. Admin (Администратор)
-Привилегированная роль для администраторов системы.
+### 2. Администратор (Admin)
 
 **Права:**
-*   **Все права пользователя** (включая просмотр и бронирование событий).
-*   **Управление событиями:**
-    *   Создание событий (`POST /events`).
-    *   Редактирование существующих событий (`PUT /events/{id}`).
-    *   Удаление событий (`DELETE /events/{id}`).
-*   **Управление бронированиями:**
-    *   Просмотр всех бронирований в системе.
-    *   Отмена любой брони (`DELETE /bookings/{id}`).
+* **Все права пользователя** (просмотр и бронирование событий).
+* **Управление событиями:**
+  * Создание событий (`POST /events`).
+  * Редактирование событий (`PUT /events/{id}`).
+  * Удаление событий (`DELETE /events/{id}`).
+* **Управление бронированиями:**
+  * Просмотр всех бронирований в системе.
+  * Отмена любого бронирования (`DELETE /bookings/{id}`).
 
 **Примечание по безопасности:**
-Все административные endpoints помечены атрибутами авторизации, требующими роль `Admin`. Попытка выполнения действий от имени `User` на этих endpoint'ах приведет к ответу `403 Forbidden`.
+Все административные эндпоинты помечены атрибутом `[Authorize(Roles = "Admin")]`. Попытка выполнения административных действий от имени `User` возвращает `403 Forbidden`.
 
-### Инициализация администратора
+### Инициализация администраторов
 
-По умолчанию при создании нового пользователя ему назначается роль `User`. 
+По умолчанию новые пользователи получают роль `User`.
+Механизм seed создаёт администраторов, указанных в конфигурации, при запуске.
 
-В системе реализован механизм начального заполнения базы данных (seed). 
-При запуске приложения автоматически создаются администраторы, указанные в конфигурации.
+#### Настройка seed-администраторов
 
-#### Настройка seed-пользователей
-
-Логины и пароли администраторов хранятся в `appsettings.Development.json` (этот файл не попадает в git).
+Логины и пароли администраторов хранятся в `appsettings.Development.json` (не коммитятся в git).
 
 **`appsettings.Development.json` (не коммитится):**
 ```json
@@ -116,8 +111,6 @@ API предоставляет полный цикл операций **CRUD**:
   }
 }
 ```
- 
-В `appsettings.json` массив **Admins** пустой, в целях безопасности.
 
 **`appsettings.json` (коммитится):**
 ```json
@@ -128,23 +121,22 @@ API предоставляет полный цикл операций **CRUD**:
 }
 ```
 
-> ⚠️ appsettings.Development.json уже добавлен в .gitignore.
-> Если вы хотите изменить список администраторов или их пароли — редактируйте только appsettings.Development.json.
-> Создайте данный файл в корневой папке проекта каждого сервиса, взяв за основу appsettings.json, и заполните нужными значениями.
+> ⚠️ `appsettings.Development.json` находится в `.gitignore`.
+> Для изменения администраторов редактируйте только `appsettings.Development.json` для каждого сервиса.
 
 ---
 
-### 🔍 Фильтрация при GET /events
+## 🔍 Фильтрация событий — GET /events
 
-Поддерживаются параметры:
-- `title` — частичный поиск по названию (регистронезависимо)
-- `from` — события, начинающиеся не раньше указанной даты
-- `to` — события, заканчивающиеся не позже указанной даты
-- `page` — номер страницы (мин. 1, по умолчанию — 1)
-- `pageSize` — размер страницы (от 1 до 100, по умолчанию — 10)
+Поддерживаемые параметры запроса:
+- `title` — частичный поиск без учёта регистра
+- `from` — события, начинающиеся не ранее этой даты
+- `to` — события, заканчивающиеся не позже этой даты
+- `page` — номер страницы (мин 1, по умолчанию 1)
+- `pageSize` — размер страницы (1–100, по умолчанию 10)
 
-> Пример:  
-> `GET /api/events?title=встреча&from=2026-05-14&to=2026-05-15&page=1&pageSize=5`
+> Пример:
+> `GET /api/events?title=meeting&from=2026-05-14&to=2026-05-15&page=1&pageSize=5`
 
 ---
 
@@ -152,32 +144,32 @@ API предоставляет полный цикл операций **CRUD**:
 
 - **.NET 10** / **C# 12**
 - **ASP.NET Core Web API**
-- **PostgreSQL** (продакшен) / **In-Memory** (тесты)
-- **Entity Framework Core** (Npgsql провайдер)
+- **PostgreSQL 16** (по одной базе на сервис)
+- **Entity Framework Core 10** (провайдер Npgsql)
 - **Dependency Injection (DI)**
-- **DTO для запросов/ответов** — изоляция модели
-- **Кастомная валидация** через `IValidatableObject`
-- **Потокобезопасность** с `SemaphoreSlim`
+- **DTOs** — изоляция моделей
+- **Кастомная валидация** через исключения домена
+- **Потокобезопасные операции** с `SemaphoreSlim`
 - **Swagger UI** — документация API
-- **XML-документация** — для IntelliSense и Swagger
-- **Фоновые службы** — обработка броней
-- **JWT-токены** — аутентификация пользователей и управление доступом к эндпоинтам API
-- **Apache Kafka** — асинхронная межсервисная коммуникация (pub/sub)
+- **XML-документация** — IntelliSense и Swagger
+- **Фоновые сервисы** — обработка бронирований
+- **JWT-токены** — аутентификация и авторизация
+- **Apache Kafka** — асинхронное межсервисное взаимодействие (pub/sub)
 - **Confluent.Kafka** — .NET-клиент для Kafka
 
 ---
 
-## 🏗 Архитектура решения
+## 🏗 Архитектура
 
-Проект построен как набор **трёх независимых микросервисов** с **разделяемым проектом контрактов**.  
-Каждый сервис реализован по принципам **чистой архитектуры (Clean Architecture)** с чётким разделением на слои.
+Решение состоит из **трёх независимых микросервисов** и **разделяемого проекта контрактов**.
+Каждый сервис следует **чистой архитектуре** с чётким разделением слоёв.
 
-### Общая структура
+### Структура решения
 
 ```
 HomeWork/
-├── EventMgtService.sln                    # Решение (3 сервиса + Contracts + тесты)
-├── docker-compose.yml                     # PostgreSQL + Kafka
+├── EventMgtService.sln                    # Решение (3 сервиса + Contracts)
+├── docker-compose.yml                     # PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
 │
 ├── EventMgtApi.Contracts/                 # 📦 Разделяемый проект контрактов
 │   ├── EventMgtApi.Contracts.csproj
@@ -185,27 +177,33 @@ HomeWork/
 │   │   ├── BookingStatus.cs               # Статусы бронирований
 │   │   └── UserRole.cs                    # Роли пользователей
 │   ├── Events/DTOs/
-│   │   ├── EventDto.cs                    # DTO создания/обновления события
-│   │   ├── EventDtoResponse.cs            # DTO ответа по событию
-│   │   └── PaginatedResult.cs             # Пагинация
+│   │   ├── EventDto.cs                    # DTO для создания/обновления события
+│   │   ├── EventDtoResponse.cs            # DTO ответа события
+│   │   └── PaginatedResult.cs             # Результат пагинации
 │   ├── Bookings/DTOs/
-│   │   ├── BookingResponseDto.cs          # DTO ответа по бронированию
-│   │   └── CreateBookingRequestDto.cs     # DTO создания брони
+│   │   ├── BookingResponseDto.cs          # DTO ответа бронирования
+│   │   └── CreateBookingRequestDto.cs     # DTO запроса на создание бронирования
 │   ├── Users/DTOs/
-│   │   └── UserDtos.cs                    # DTO пользователей (регистрация, логин)
+│   │   ├── RegisterRequestDto.cs          # Запрос на регистрацию
+│   │   ├── RegisterResponseDto.cs         # Ответ регистрации
+│   │   ├── LoginRequestDto.cs             # Запрос на вход
+│   │   └── LoginResponseDto.cs            # Ответ входа (с JWT-токеном)
 │   ├── Services/
-│   │   ├── IUserService.cs                # Контраст сервиса пользователей
-│   │   ├── IEventService.cs               # Контраст сервиса событий
-│   │   └── IBookingService.cs             # Контраст сервиса броней
-│   ├── Options/
-│   │   └── JwtOptions.cs                  # Конфигурация JWT
+│   │   ├── IUserService.cs                # Интерфейс сервиса пользователей
+│   │   ├── IEventService.cs               # Интерфейс сервиса событий
+│   │   └── IBookingService.cs             # Интерфейс сервиса бронирований
 │   ├── ServiceInteraction/
-│   │   ├── ServiceInteractionConstants.cs # Константы топиков Kafka
+│   │   ├── ServiceInteractionConstants.cs # Имена топиков Kafka
+│   │   ├── IEventPublisher.cs             # Интерфейс издателя Kafka
 │   │   └── ServiceEvents/
-│   │       └── BookingConfirmed.cs        # Событие Kafka "Бронь подтверждена"
-│   └── Middleware/                        # Общие middleware (используются всеми сервисами)
+│   │       ├── BookingConfirmed.cs        # Событие «Бронирование подтверждено»
+│   │       ├── BookingCancelled.cs        # Событие «Бронирование отменено»
+│   │       └── BookingConfirmationFailed.cs # Событие «Ошибка подтверждения бронирования»
+│   └── Options/
+│       ├── JwtOptions.cs                  # Конфигурация JWT
+│       └── KafkaOptions.cs                # Конфигурация Kafka
 │
-├── EventMgtApi.UsersService/              # 👤 Сервис пользователей (аутентификация)
+├── EventMgtApi.UsersService/              # 👤 Сервис пользователей (Авторизация)
 │   ├── EventMgtApi.UsersService.Domain/
 │   │   ├── Entities/
 │   │   │   └── User.cs                    # Сущность пользователя
@@ -213,18 +211,18 @@ HomeWork/
 │   │   │   ├── InvalidCredentialsException.cs
 │   │   │   └── ValidationException.cs
 │   │   ├── Options/
-│   │   │   └── SeedOptions.cs             # Seed-конфигурация администраторов
+│   │   │   └── SeedOptions.cs             # Конфигурация seed-администраторов
 │   │   └── EventMgtApi.UsersService.Domain.csproj
 │   ├── EventMgtApi.UsersService.Application/
 │   │   ├── Services/
-│   │   │   └── UserService.cs             # Бизнес-логика: регистрация, логин
+│   │   │   └── UserService.cs             # Логика регистрации и входа
 │   │   ├── Abstractions/
 │   │   │   ├── Persistence/
-│   │   │   │   └── IUserRepository.cs     # Репо-интерфейс
+│   │   │   │   └── IUserRepository.cs     # Интерфейс репозитория
 │   │   │   └── Services/
-│   │   │       ├── IJwtTokenService.cs    # Контраст генерации JWT
-│   │   │       ├── IPasswordHasher.cs     # Контраст хеширования паролей
-│   │   │       └── ISeedService.cs        # Контраст seed-заполнения
+│   │   │       ├── IJwtTokenService.cs    # Интерфейс генерации JWT
+│   │   │       ├── IPasswordHasher.cs     # Интерфейс хеширования паролей
+│   │   │       └── ISeedService.cs        # Интерфейс seed-данных
 │   │   ├── DependencyInjection/
 │   │   │   └── ApplicationServiceCollectionExtensions.cs
 │   │   └── EventMgtApi.UsersService.Application.csproj
@@ -232,16 +230,16 @@ HomeWork/
 │   │   ├── Persistence/
 │   │   │   ├── UserDbContext.cs           # DbContext для пользователей
 │   │   │   ├── Configurations/
-│   │   │   │   └── UserConfiguration.cs   # Fluent-конфигурация Entity
+│   │   │   │   └── UserConfiguration.cs   # Конфигурация Fluent API
 │   │   │   └── Repositories/
 │   │   │       └── UserRepository.cs      # Реализация IUserRepository
 │   │   ├── Services/
 │   │   │   ├── JwtTokenService.cs         # Генерация JWT-токенов
 │   │   │   ├── PasswordHasher.cs          # Хеширование паролей (PBKDF2)
-│   │   │   └── SeedService.cs             # Seed-заполнение администраторов
+│   │   │   └── SeedService.cs             # Заполнение seed-администраторов
 │   │   ├── DependencyInjection/
 │   │   │   └── InfrastructureServiceCollectionExtensions.cs
-│   │   ├── Migrations/                    # Миграции EF Core
+│   │   ├── Migrations/                    # EF Core миграции
 │   │   └── EventMgtApi.UsersService.Infrastructure.csproj
 │   └── EventMgtApi.UsersService.Web/
 │       ├── Controllers/
@@ -261,21 +259,19 @@ HomeWork/
 ├── EventMgtApi.EventsService/             # 📅 Сервис событий (CRUD)
 │   ├── EventMgtApi.EventsService.Domain/
 │   │   ├── Entities/
-│   │   │   └── Event.cs                   # Сущность события
+│   │   │   └── Event.cs                   # Сущность со��ытия
 │   │   ├── Exceptions/
 │   │   │   ├── NotFoundException.cs
 │   │   │   ├── ValidationException.cs
 │   │   │   └── NoAvailableSeatsException.cs
-│   │   ├── Options/
-│   │   │   └── KafkaConsumerOptions.cs    # Конфигурация Kafka-консьюмера
 │   │   └── EventMgtApi.EventsService.Domain.csproj
 │   ├── EventMgtApi.EventsService.Application/
 │   │   ├── Events/
-│   │   │   ├── EventService.cs            # Бизнес-логика: CRUD событий
+│   │   │   ├── EventService.cs            # Логика CRUD
 │   │   │   └── Extensions/
 │   │   │       └── EventMappingExtensions.cs
 │   │   ├── Persistence/
-│   │   │   └── IEventRepository.cs        # Репо-интерфейс
+│   │   │   └── IEventRepository.cs        # Интерфейс репозитория
 │   │   ├── DependencyInjection/
 │   │   │   └── ApplicationServiceCollectionExtensions.cs
 │   │   └── EventMgtApi.EventsService.Application.csproj
@@ -283,12 +279,12 @@ HomeWork/
 │   │   ├── Persistence/
 │   │   │   ├── EventDbContext.cs          # DbContext для событий
 │   │   │   ├── Configurations/
-│   │   │   │   └── EventConfiguration.cs  # Fluent-конфигурация Entity
+│   │   │   │   └── EventConfiguration.cs  # Конфигурация Fluent API
 │   │   │   └── Repositories/
 │   │   │       └── EventRepository.cs     # Реализация IEventRepository
 │   │   ├── ServiceInteractions/
-│   │   │   ├── EventServiceMessagingConsumer.cs # Подписка на Kafka-события
-│   │   │   └── KafkaTopicInitializer.cs # Инициализация топиков Kafka
+│   │   │   ├── EventServiceMessagingConsumer.cs  # Потребитель Kafka
+│   │   │   └── KafkaTopicInitializer.cs         # Инициализация топиков Kafka
 │   │   ├── DependencyInjection/
 │   │   │   └── InfrastructureServiceCollectionExtensions.cs
 │   │   ├── Migrations/
@@ -320,18 +316,17 @@ HomeWork/
 │   │   │   ├── NotFoundException.cs
 │   │   │   └── ValidationException.cs
 │   │   ├── Options/
-│   │   │   ├── BookingOptions.cs          # Конфиг бронирования (лимиты и т.д.)
-│   │   │   └── KafkaOptions.cs            # Конфигурация Kafka-продюсера
+│   │   │   └── BookingOptions.cs          # Конфигурация ограничений бронирований
 │   │   └── EventMgtApi.BookingsService.Domain.csproj
 │   ├── EventMgtApi.BookingsService.Application/
 │   │   ├── Bookings/
-│   │   │   ├── BookingService.cs          # Бизнес-логика: создание, отмена броней
+│   │   │   ├── BookingService.cs          # Создание, отмена бронирований
 │   │   │   └── Extensions/
 │   │   │       └── BookingsMappingExtensions.cs
 │   │   ├── Persistence/
-│   │   │   └── IBookingRepository.cs      # Репо-интерфейс
+│   │   │   └── IBookingRepository.cs      # Интерфейс репозитория
 │   │   ├── ServiceInteraction/
-│   │   │   └── IEventPublisher.cs         # Контраст публикации Kafka-событий
+│   │   │   └── IEventPublisher.cs         # Интерфейс издателя Kafka
 │   │   ├── DependencyInjection/
 │   │   │   └── ApplicationServiceCollectionExtensions.cs
 │   │   └── EventMgtApi.BookingsService.Application.csproj
@@ -339,20 +334,21 @@ HomeWork/
 │   │   ├── Persistence/
 │   │   │   ├── BookingDbContext.cs        # DbContext для бронирований
 │   │   │   ├── Configurations/
-│   │   │   │   └── BookingConfiguration.cs # Fluent-конфигурация Entity
+│   │   │   │   └── BookingConfiguration.cs # Конфигурация Fluent API
 │   │   │   └── Repositories/
 │   │   │       └── BookingRepository.cs   # Реализация IBookingRepository
 │   │   ├── Persistence/Services/
-│   │   │   └── BookingProcessingBackgroundService.cs # Фоновая обработка Pending-броней
+│   │   │   └── BookingProcessingBackgroundService.cs  # Фоновая обработка Pending
 │   │   ├── ServiceInteraction/
-│   │   │   └── BookingServiceMessagingPublisher.cs     # Реализация публикации в Kafka
+│   │   │   ├── BookingServiceMessagingPublisher.cs    # Издатель Kafka
+│   │   │   └── BookingServiceMessagingConsumer.cs     # Потребитель Kafka
 │   │   ├── DependencyInjection/
 │   │   │   └── InfrastructureServiceCollectionExtensions.cs
 │   │   ├── Migrations/
 │   │   └── EventMgtApi.BookingsService.Infrastructure.csproj
 │   └── EventMgtApi.BookingsService.Web/
 │       ├── Controllers/
-│       │   └── BookingsController.cs       # POST /events/{id}/book, GET/DELETE /bookings
+│       │   └── BookingsController.cs       # POST /book, GET/DELETE /bookings
 │       ├── Middleware/
 │       │   ├── GlobalExceptionHandlingMiddleware.cs
 │       │   └── JwtBearerEvents.cs
@@ -365,94 +361,152 @@ HomeWork/
 │       ├── appsettings.json
 │       └── EventMgtApi.BookingsService.Web.csproj
 │
-├── EventMgtApi.UnitTests/                 # 🧪 Unit-тесты
-├── EventMgtApi.IntegrationTests/          # 🧪 Интеграционные тесты
-│
-└── docker-compose.yml                     # 🐳 PostgreSQL + Kafka
+└── docker-compose.yml                     # 🐳 PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
 ```
 
 ---
 
-#### 🔁 Принципы разделения слоёв (в каждом сервисе):
+### Принципы разделения слоёв (в каждом сервисе)
 
 | Слой | Зависит от | Ответственность |
 |------|-----------|-----------------|
-| **Domain** | Ничего | Бизнес-сущности, исключения, доменные опции. Не зависит ни от чего внешнего. |
-| **Application** | Domain | Бизнес-логика, DTO, контракты репозиториев (Abstractions), DI-расширения. |
-| **Infrastructure** | Domain + Application | Реализации репозиториев (EF Core), фоновые службы, Kafka-клиенты, DI-расширения. |
+| **Domain** | Ничего | Бизнес-сущности, исключения домена, опции домена. Нет внешних зависимостей. |
+| **Application** | Domain | Бизнес-логика, DTO, абстракции репозиториев, расширения DI. |
+| **Infrastructure** | Domain + Application | Реализации репозиториев (EF Core), фоновые сервисы, клиенты Kafka, расширения DI. |
 | **Presentation** | Application + Domain + Infrastructure | HTTP-контроллеры, middleware, фильтры, конфигурация приложения. |
 
-> 💡 Такая структура позволяет:
-> - Легко заменить хранилище (EF Core → Redis и т.д.).
-> - Писать изолированные unit-тесты.
-> - Добавлять новые функции без нарушения существующего кода.
-> - Поддерживать проект при росте числа разработчиков.
-> - Запускать каждый сервис независимо.
+> 💡 Эта структура позволяет:
+> - Легко заменять хранилища (EF Core → Redis и т.д.)
+> - Изолированное модульное тестирование
+> - Добавление новых функций без нарушения существующего кода
+> - Поддержка проекта при росте команды
+> - Запуск каждого сервиса независимо
 
-### 🔄 Межсервисная коммуникация
+---
 
-Сервисы **не общаются** напрямую через HTTP-вызовы друг к другу. Вместо этого используется **Apache Kafka** для асинхронной pub/sub коммуникации:
+### 🔄 Межсервисное взаимодействие
+
+Сервисы **не** взаимодействуют напрямую через HTTP. Вместо этого используется **Apache Kafka** для асинхронного pub/sub:
 
 | Событие | Издатель | Подписчики | Описание |
 |---------|----------|------------|----------|
-| `BookingConfirmed` | `BookingsService` | `EventsService` | Уведомление о подтверждённой брони для обновления количества доступных мест |
+| `BookingConfirmed` | `BookingsService` | `EventsService` | Уведомление о подтверждении бронирования для обновления `AvailableSeats` |
+| `BookingCancelled` | `BookingsService` | `EventsService` | Уведомление об отмене бронирования для освобождения мест |
+| `BookingConfirmationFailed` | `EventsService` | `BookingsService` | Ошибка подтверждения (нет мест / событие началось) |
 
-- **BookingsService** — публикует событие `BookingConfirmed` в Kafka при подтверждении брони.
-- **EventsService** — подписывается на топик и обновляет `AvailableSeats` у события.
+- **BookingsService** публикует `BookingConfirmed` и `BookingCancelled` в Kafka при подтверждении или отмене бронирования.
+- **EventsService** подписывается на эти топики и обновляет `AvailableSeats` для соответствующего события.
+- **EventsService** публикует `BookingConfirmationFailed`, когда недостаточно мест или событие началось.
+- **BookingsService** подписывается на `BookingConfirmationFailed` и может отклонить соответствующее бронирование.
 
-Общие контракты событий (сериализуемые DTO) хранятся в `EventMgtApi.Contracts/ServiceInteraction/ServiceEvents/`.
+Все разделяемые контракты событий (сериализуемые DTO) хранятся в `EventMgtApi.Contracts/ServiceInteraction/ServiceEvents/`.
+
+---
+
+### 🛡 Идемпотентность обработки сообщений
+
+Повторная или дублирующаяся доставка Kafka-сообщений **не приводит** к некорректному изменению количества мест.
+
+**Механизм:**
+
+1. В `EventsService` создана сущность `ProcessedBooking` с составным ключом `(EventId, BookingId, EventType)`.
+2. Перед обработкой сообщения `BookingConfirmed` или `BookingCancelled` потребитель проверяет наличие записи через `IProcessedBookingRepository.ExistsAsync`.
+3. Если запись уже существует — сообщение игнорируется (дубликат).
+4. Если записи нет — сообщение обрабатывается (уменьшается/увеличивается `AvailableSeats`), а запись в `ProcessedBooking` добавляется.
+
+> 💡 Это гарантирует, что даже при повторной доставке одного и того же сообщения (at-least-once delivery) места будут учтены только один раз.
 
 ---
 
 ## 🚀 Запуск проекта
 
-### Предварительные требования
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- **PostgreSQL 14+** (локально или в Docker)
-- **Apache Kafka** (локально или в Docker)
-- **[Docker](https://www.docker.com/)** (для быстрого запуска PostgreSQL и Kafka через `docker compose up -d`)
+### Вариант 1: Полный запуск через Docker Compose (рекомендуется)
+
+Все сервисы, базы данных и Kafka запускаются в едином Docker Compose-стеке. Сборка и запуск одной командой:
+
+```bash
+docker compose up -d --build
+```
+
+Это соберёт Dockerfile каждого сервиса и запустит весь стек:
+
+| Сервис | Контейнер | Порт (хост) | Swagger UI |
+|--------|-----------|-------------|------------|
+| **UsersService** | users-service | 7001 | **http**://localhost:7001/swagger |
+| **EventsService** | events-service | 7002 | **http**://localhost:7002/swagger |
+| **BookingsService** | bookings-service | 7003 | **http**://localhost:7003/swagger |
+
+Инфраструктура:
+
+| Сервис | Контейнер | Порт (хост) |
+|--------|-----------|-------------|
+| Zookeeper | eventapi-zookeeper | 2181 |
+| Kafka | eventapi-kafka | 9092 |
+| Kafka UI | kafka-ui | 8080 |
+| PostgreSQL (Users) | users-postgres | 5433 |
+| PostgreSQL (Events) | events-postgres | 5434 |
+| PostgreSQL (Bookings) | bookings-postgres | 5435 |
+
+> 💡 Все три сервиса используют одинаковые конфигурации JWT и подключаются к базам по внутреннему Docker-имени хоста (например, `Host=postgres-users;Port=5432`). `appsettings.Development.json` не нужен.
+
+### Вариант 2: Локальный запуск сервисов (.NET CLI) + Docker-инфраструктура
+
+Если вы хотите разрабатывать сервисы локально, сначала запустите инфраструктуру:
+
+```bash
+docker compose up -d zookeeper kafka postgres-users postgres-events postgres-bookings
+```
+
+Затем настройте конфигурацию для каждого сервиса (см. ниже) и запустите:
+
+```bash
+dotnet restore
+dotnet build
+```
+
+```bash
+# Сервис пользователей
+dotnet run --project EventMgtApi.UsersService/EventMgtApi.UsersService.Web/EventMgtApi.UsersService.Web.csproj
+
+# Сервис событий
+dotnet run --project EventMgtApi.EventsService/EventMgtApi.EventsService.Web/EventMgtApi.EventsService.Web.csproj
+
+# Сервис бронирований
+dotnet run --project EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web/EventMgtApi.BookingsService.Web.csproj
+```
+
+🔐 При таком варианте запуска каждый сервис работает по HTTP**S** на своём порту (см. `Properties/launchSettings.json`):
+
+| Сервис | Swagger UI |
+|--------|-----------|
+| **UsersService** (auth) | **https**://localhost:7001/swagger |
+| **EventsService** (events) | **https**://localhost:7002/swagger |
+| **BookingsService** (bookings) | **https**://localhost:7003/swagger |
 
 ---
 
-### Настройка PostgreSQL и Kafka
+### Требования
 
-Серверы PostgreSQL и Kafka могут быть запущены локально или в Docker.
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) — для локального запуска (Вариант 2)
+- **[Docker](https://www.docker.com/)** — для запуска инфраструктуры и сборки Docker-образов
 
-#### Запуск через Docker (рекомендуется)
+---
 
-Проще всего запустить инфраструктуру с помощью `docker compose`:
+### Конфигурация (только для Варианта 2)
 
-```bash
-docker compose up -d
-```
+Каждому сервису нужен свой `appsettings.Development.json`, в папке `Web` проекта.
 
-Это запустит контейнеры с PostgreSQL и Kafka по умолчанию:
-
-| Сервис | Хост | Порт |
-|--------|------|------|
-| PostgreSQL | `localhost` | `5432` |
-| Database | `eventapi` | — |
-| Username | `postgres` | — |
-| Password | `postgres` | — |
-| Kafka | `localhost` | `9092` |
-
-#### Создайте базу данных (ручной способ):
-
-```bash
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE eventapi;"
-```
-
-#### Добавьте строки подключения в `appsettings.Development.json` **каждого сервиса**:
+Примеры:
 
 **UsersService** (`EventMgtApi.UsersService.Web/appsettings.Development.json`):
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi_users;Username=postgres;Password=postgres"
+    "DefaultConnection": "Host=localhost;Port=5433;Database=users_db;Username=postgres;Password=postgres"
   },
   "Jwt": {
     "Secret": "your-secret-key-here-must-be-at-least-32-chars-long",
-    "Issuer": "EventMgtApi",
+    "Issuer": "EventMgtApi.UsersService",
     "Audience": "EventMgtApi",
     "ExpiryMinutes": 60
   },
@@ -469,11 +523,22 @@ PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE ev
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi_events;Username=postgres;Password=postgres"
+    "DefaultConnection": "Host=localhost;Port=5434;Database=events_db;Username=postgres;Password=postgres"
   },
   "Kafka": {
     "BootstrapServers": "localhost:9092",
-    "GroupId": "events-service-group"
+    "ConsumerGroup": "events-service-group",
+    "Topics": [
+      "booking-confirmed",
+      "booking-cancelled",
+      "booking-confirmation-failed"
+    ]
+  },
+  "Jwt": {
+    "Secret": "your-secret-key-here-must-be-at-least-32-chars-long",
+    "Issuer": "EventMgtApi.UsersService",
+    "Audience": "EventMgtApi",
+    "ExpiryMinutes": 60
   }
 }
 ```
@@ -482,98 +547,64 @@ PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE ev
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=eventapi_bookings;Username=postgres;Password=postgres"
+    "DefaultConnection": "Host=localhost;Port=5435;Database=bookings_db;Username=postgres;Password=postgres"
   },
   "Kafka": {
-    "BootstrapServers": "localhost:9092"
+    "BootstrapServers": "localhost:9092",
+    "ConsumerGroup": "bookings-service-group",
+    "Topics": [
+      "booking-confirmation-failed"
+    ]
   },
   "BookingOptions": {
-    "MaxActiveBookingsPerUser": 10
+    "MaxActiveBookings": 10
+  },
+  "Jwt": {
+    "Secret": "your-secret-key-here-must-be-at-least-32-chars-long",
+    "Issuer": "EventMgtApi.UsersService",
+    "Audience": "EventMgtApi",
+    "ExpiryMinutes": 60
+  },
+  "SeedOptions": {
+    "Admins": []
   }
 }
 ```
 
-> 🔒 Секреты (JWT Secret, пароли) хранятся в `appsettings.Development.json` — этот файл не попадает в git.
-> Создайте файл `appsettings.Development.json` в корневой папке каждого сервиса, взяв за основу `appsettings.json`.
-
----
-
-### Сборка и запуск
-
-В корне репозитория выполните:
-
-```bash
-dotnet restore
-dotnet build
-```
-
-Запуск каждого сервиса:
-
-```bash
-# Сервис пользователей
-dotnet run --project EventMgtApi.UsersService/EventMgtApi.UsersService.Web/EventMgtApi.UsersService.Web.csproj
-
-# Сервис событий
-dotnet run --project EventMgtApi.EventsService/EventMgtApi.EventsService.Web/EventMgtApi.EventsService.Web.csproj
-
-# Сервис бронирований
-dotnet run --project EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web/EventMgtApi.BookingsService.Web.csproj
-```
-
-🔐 Каждый сервис работает по HTTPS на своём порту (указан в `Properties/launchSettings.json`).
-
----
-
-### Адреса после запуска
-
-| Сервис | Swagger UI |
-|--------|-----------|
-| **UsersService** (аутентификация) | https://localhost:7001/swagger |
-| **EventsService** (события) | https://localhost:7002/swagger |
-| **BookingsService** (брони) | https://localhost:7003/swagger |
-
-> 💡 Порты могут отличаться — смотрите `Properties/launchSettings.json` каждого сервиса.
+> 🔒 Секреты (JWT Secret, пароли) хранятся в `appsettings.Development.json` — не коммитятся в git.
+> Создайте `appsettings.Development.json` в папке `Web` каждого сервиса на основе `appsettings.json` и примеров выше.
 
 ---
 
 ## 🔐 Получение JWT-токена через Swagger
 
-Для работы с защищёнными эндпоинтами (создание событий, бронирование и т.д.) необходима аутентификация через JWT-токен.
+### Шаг 1. Регистрация пользователя
 
-### Шаг 1. Зарегистрируйте пользователя
+В **UsersService** Swagger, откройте `POST /api/auth/register`:
 
-В Swagger UI сервиса **UsersService** откройте эндпоинт `POST /api/auth/register`:
-
-1. Нажмите кнопку **Try it out**
-2. В поле **Request body** введите JSON:
-
+1. Нажмите **Try it out**
+2. Введите JSON:
    ```json
    {
      "login": "User1",
      "password": "User1234!"
    }
    ```
+3. Нажмите **Execute** — ответ **201 Created** означает успех.
 
-💡 Доступные роли: User. Для создания администратора — см. раздел **Инициализация администратора**.
+### Шаг 2. Вход
 
-3. Нажмите Execute — ответ **201 Created** означает успешную регистрацию.
+В **UsersService** Swagger, откройте `POST /api/auth/login`:
 
-### Шаг 2. Войдите в систему
-
-Откройте эндпоинт `POST /api/auth/login` в **UsersService**:
-
-1. Нажмите кнопку **Try it out**
-2. Введите данные:
-
+1. Нажмите **Try it out**
+2. Введите:
    ```json
    {
      "login": "User1",
      "password": "User1234!"
    }
    ```
-
-3. Нажмите Execute — вы получите ответ:
-
+3. Нажмите **Execute** — вы получите:
    ```json
    {
      "token": "eyJhbGciOiJIUzI1NiIs...",
@@ -582,135 +613,39 @@ dotnet run --project EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web
    }
    ```
 
-### Шаг 3. Скопируйте токен
+### Шаг 3. Авторизация
 
-В ответе скопируйте значение поля `token`.
-
-### Шаг 4. Авторизуйтесь через Swagger
-
-1. В правом верхнем углу Swagger UI соответствующего сервиса нажмите кнопку **🔒 Authorize**
-2. В поле Value введите токен (без кавычек JSON)
+1. В правом верхнем углу любого Swagger UI нажмите **🔒 Authorize**
+2. Вставьте токен (без кавычек)
 3. Нажмите **Authorize**, затем **Close**
 
-Теперь все защищённые endpoints станут доступны.
+Защищённые эндпоинты теперь доступны.
 
-### Шаг 5. Проверка доступа
+### Шаг 4. Тестирование доступа
 
-1. Откройте защищенный эндпоинт в сервисе **EventsService**, например `GET /api/events/{id}`.
-   - Рядом с методом должен появиться закрытый замок 🔒.
-   - Нажмите **Try it out**, введите любой ID события и нажмите **Execute**.
-   - Вы должны получить данные (200 OK), а не ошибку 401 Unauthorized.
-
-2. Проверьте права администратора:
-   - Откройте метод `POST /api/events` в **EventsService**.
-   - В теле запроса передайте объект:
-
+1. Откройте `POST /api/events` в **EventsService** с ролью администратора:
    ```json
    {
-     "title": "Тестовый концерт",
+     "title": "Test Concert",
      "startAt": "2026-10-10T19:00:00Z",
      "endAt": "2026-11-10T22:00:00Z",
      "totalSeats": 150
    }
    ```
-
-   Если токен имеет роль `Admin`, вернётся ответ `201 Created`. Если роль `User` — придёт ошибка `403 Forbidden`.
-
-> 💡 **Важные нюансы работы с JWT в Swagger**
-> - **Срок действия:** Токены обычно живут недолго (например, 20–30 минут). Если запросы внезапно начали возвращать 401, просто повторите Шаг 2 (Login) и обновите токен.
-> - **Копирование токена:** При копировании из поля ответа убедитесь, что захватили строку целиком, от `eyJ...` до последней точки включительно, но без кавычек JSON.
-> - **Очистка прав:** Чтобы выйти из аккаунта в Swagger, нажмите кнопку Authorize снова и нажмите Logout (или очистите поле Value). Замки на методах снова станут серыми.
+   → **201 Created** для Admin, **403 Forbidden** для User.
 
 ---
 
-> 📥 **Пример: Создание события**
+## 🆕 Бронирование: `POST /api/events/{eventId:guid}/book`
 
-```http
-POST /api/events
-Content-Type: application/json
-```
+Создаёт ��овое бронирование для указанного события.
+Начальный статус — `Pending`.
 
-```json
-{
-  "title": "Team Meeting",
-  "description": "Обсуждение планов",
-  "startAt": "2027-04-05T10:00:00Z",
-  "endAt": "2027-04-05T11:00:00Z"
-}
-```
-
-> ✅ **Успешный ответ (201 Created)**
-
-```http
-HTTP/1.1 201 Created
-Location: https://localhost:7002/api/events/3fa85f64-5717-4562-b3fc-2c963f66afa6
-```
-
-```json
-{
-  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "title": "Team Meeting",
-  "description": "Обсуждение планов",
-  "startAt": "2027-04-05T10:00:00Z",
-  "endAt": "2027-04-05T11:00:00Z"
-}
-```
-
----
-
-> ❌ **Формат ответа при ошибках**
-
-API возвращает ошибки в стандартизированном формате `ProblemDetails` (`application/problem+json`).
-
-#### Валидация:
-
-```json
-{
-  "title": "Ошибка валидации",
-  "status": 400,
-  "detail": "Дата окончания обязательна.",
-  "instance": "/api/Events"
-}
-```
-
-#### Ресурс не найден:
-
-```json
-{
-  "title": "Ресурс не найден",
-  "status": 404,
-  "detail": "Событие с ID 4cbde443-... не найдено.",
-  "instance": "/api/Events/4cbde443-..."
-}
-```
-
-#### Внутренняя ошибка сервера:
-
-```json
-{
-  "title": "Произошла ошибка",
-  "status": 500,
-  "detail": "[детали ошибки]",
-  "instance": "/api/Events/..."
-}
-```
-
-- Все сообщения — на русском языке.
-- Используется централизованная обработка через middleware.
-- Соответствует RFC 9110 (type опущен, если не требуется).
-
----
-
-### 🆕 Создание брони: `POST /api/events/{eventId:guid}/book`
-
-Сервис **BookingsService** cоздаёт новую бронь на указанное событие.  
-Бронь изначально имеет статус `Pending`.
-
-> **HTTP 201 Created** — бронь создана и принята в обработку  
-> **HTTP 409 Conflict** — отсутствуют свободные места (овербукинг)  
+> **HTTP 201 Created** — бронирование создано и поставлено в очередь на обработку
+> **HTTP 409 Conflict** — нет доступных мест
 > **Location** — ссылка на `GET /api/bookings/{id}`
 
-#### Пример запроса:
+#### Пример:
 ```http
 POST /api/events/3fa85f64-5717-4562-b3fc-2c963f66afa6/book
 Content-Type: application/json
@@ -719,8 +654,6 @@ Content-Type: application/json
 ```json
 {}
 ```
-
-> ⚠️ Тело запроса пока пустое (может быть расширено в будущем).
 
 #### Успешный ответ:
 ```http
@@ -738,39 +671,22 @@ Location: https://localhost:7003/api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f
 }
 ```
 
-#### Ошибка 409 Conflict (отсутствуют места):
-```http
-HTTP/1.1 409 Conflict
-```
-
-```json
-{
-  "title": "Недостаточно доступных мест",
-  "status": 409,
-  "detail": "Нет доступных мест для данного события.",
-  "instance": "/api/events/3fa85f64-5717-4562-b3fc-2c963f66afa6/book"
-}
-```
-
-> 💡 Этот статус возвращается, когда `AvailableSeats == 0`, что предотвращает овербукинг.
-
 ---
 
-### 🔍 Проверка статуса брони: `GET /api/bookings/{id:guid}`
+## 🔍 Статус бронирования: `GET /api/bookings/{id:guid}`
 
-Сервис **BookingsService** возвращает текущий статус брони по её идентификатору.
+Возвращает текущий статус бронирования.
 
-> **HTTP 200 OK** — бронь найдена  
-> **HTTP 400 Bad Request** — некорректный формат идентификатора  
-> **HTTP 401 Unauthorized** — требуется аутентификация  
-> **HTTP 404 Not Found** — бронь не существует
+> **HTTP 200 OK** — найдено
+> **HTTP 401 Unauthorized** — требуется авторизация
+> **HTTP 403 Forbidden** — это не ваше бронирование
+> **HTTP 404 Not Found** — не существует
 
-#### Пример запроса:
+#### Пример:
 ```http
 GET /api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
 ```
 
-#### Ответ:
 ```json
 {
   "id": "9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a",
@@ -781,165 +697,88 @@ GET /api/bookings/9e1b2f4d-8a3c-4e2a-9f1a-1b2c3d4e5f6a
 }
 ```
 
-### 🔍 Отмена брони: `DELETE /api/bookings/{id:guid}`
+---
 
-Сервис **BookingsService** переводит бронь в статус **Cancelled**.
+## 🔍 Отмена бронирования: `DELETE /api/bookings/{id:guid}`
 
-> **HTTP 204 No Content** — бронь отменена  
-> **HTTP 400 Bad Request** — ошибка отмены брони  
-> **HTTP 401 Unauthorized** — требуется аутентификация  
-> **HTTP 403 Forbidden** — недостаточно прав для отмены брони  
-> **HTTP 404 Not Found** — бронь не существует
+Переводит бронирование в статус `Cancelled`.
 
-### 🔍 Регистрация нового пользователя: `POST /api/auth/register`
-
-Сервис **UsersService** регистрирует нового пользователя.
-
-> **HTTP 201 Created** — пользователь зарегистрирован  
-> **HTTP 400 Bad Request** — ошибка регистрации пользователя
-
-#### Пример запроса:
-```http
-POST /api/auth/register
-```
-
-```json
-{
-  "login": "MyUserLogin",
-  "password": "Mypwd123!"
-}
-```
-
-#### Пример тела ответа при успешной регистрации:
-```json
-{
-  "userId": "ad971e06-e7cb-4c28-a4cc-1edd34586614",
-  "login": "string88",
-  "role": "User"
-}
-```
-
-#### Пример тела ответа при ошибке регистрации:
-```json
-{
-  "title": "Ошибка валидации",
-  "status": 400,
-  "detail": "Обнаружены ошибки валидации входных данных.",
-  "instance": "/api/Auth/register",
-  "errors": {
-    "Login": [
-      "Пользователь с таким логином уже существует."
-    ]
-  }
-}
-```
-
-### 🔍 Аутентификация пользователя: `POST /api/auth/login`
-
-ервис **UsersService** аутентифицирует пользователя.
-
-> **HTTP 200 OK** — пользователь аутентифицирован  
-> **HTTP 400 Bad Request** — ошибка аутентификации  
-> **HTTP 404 Not Found** — пользователь не найден
-
-#### Пример запроса:
-```http
-POST /api/auth/login
-```
-
-```json
-{
-  "login": "MyUserName",
-  "password": "pass123"
-}
-```
-
-#### Ответ:
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cC...",
-  "login": "MyUserName",
-  "role": "User"
-}
-```
+> **HTTP 204 No Content** — отменено
+> **HTTP 401 Unauthorized** — требуется авторизация
+> **HTTP 403 Forbidden** — недостаточно прав
+> **HTTP 404 Not Found** — не существует
 
 ---
 
-## 🧩 Модель `Booking` и статусы
+## 🧩 Модель бронирования и статусы
 
-### `Booking` — модель бронирования
-- `Id`: `Guid` — уникальный идентификатор брони
-- `EventId`: `Guid` — ссылка на событие
-- `UserId`: `Guid` — ссылка на пользователя
-- `Status`: `BookingStatus` — текущий статус (см. ниже)
-- `CreatedAt`: `DateTime` — когда создана
-- `ProcessedAt`: `DateTime?` — когда обработана (может быть `null`)
+### Сущность `Booking`
 
-### `BookingStatus` — возможные статусы
+| Поле | Тип | Описание |
+|------|------|----------|
+| `Id` | `Guid` | Уникальный идентификатор |
+| `EventId` | `Guid` | Ссылка на событие |
+| `UserId` | `Guid` | Ссылка на пользователя |
+| `Status` | `BookingStatus` | Текущий статус |
+| `CreatedAt` | `DateTime` | Время создания |
+| `ProcessedAt` | `DateTime?` | Время обработки (nullable) |
+
+### Перечисление `BookingStatus`
 ```csharp
 public enum BookingStatus
 {
-    /// <summary>Бронь создана, ожидает обработки.</summary>
-    Pending,
-
-    /// <summary>Бронь подтверждена.</summary>
-    Confirmed,
-
-    /// <summary>Бронь отклонена.</summary>
-    Rejected,
-    
-    /// <summary>Бронь отменена.</summary>
-    Cancelled
+    Pending,    // Создано, ожидает обработки
+    Confirmed,  // Подтверждено
+    Rejected,   // Отклонено
+    Cancelled   // Отменено пользователем
 }
 ```
 
 ---
 
-## ⏳ Логика фоновой обработки
+## ⏳ Фоновая обработка
 
-### Фоновая обработка броней (BookingsService)
+### Обработка бронирований (BookingsService)
 
-Брони со статусом `Pending` обрабатываются фоновым сервисом **в автоматическом режиме**.
+`BookingProcessingBackgroundService` запускается при старте:
 
-- Сервис `BookingProcessingBackgroundService` запускается при старте сервиса **BookingsService** .
-- Каждые **5 секунд** он:
-  - Ищет все брони со статусом `Pending`
-  - Для каждой:
-    - Ждёт **2 секунды** (имитация внешней системы)
-    - Меняет статус на `Confirmed`
-    - Устанавливает `ProcessedAt = DateTime.UtcNow`
-    - Публикует событие `BookingConfirmed` в **Kafka**
-    - Сохраняет изменения
+1. Каждые **5 секунд** сканирует бронирования со статусом `Pending`
+2. Для каждого:
+   - Ждёт **2 секунды** (имитация внешней системы)
+   - Меняет статус на `Confirmed`
+   - Устанавливает `ProcessedAt = DateTime.UtcNow`
+   - Публикует `BookingConfirmed` в **Kafka**
+   - Сохраняет изменения
 
-> 💡 Это имитирует интеграцию с платёжной системой или внешним API.
+### Обработка событий (EventsService)
 
-### Обработка события `BookingConfirmed` (EventsService)
+`EventServiceMessagingConsumer` подписывается на топики Kafka:
 
-Сервис **EventsService** подписан на Kafka-топик и при получении события `BookingConfirmed`:
-- Находит соответствующее событие по `EventId`
-- Уменьшает `AvailableSeats` на 1
+| Топик | Действие |
+|-------|----------|
+| `booking-confirmed` | Уменьшает `AvailableSeats` на количество забронированных мест |
+| `booking-cancelled` | Увеличивает `AvailableSeats` на количество отменённых мест |
+| `booking-confirmation-failed` | Публикуется **EventsService** при нехватке мест, подписчик — **BookingsService** |
 
-> 💡 Это обеспечивает согласованность данных между сервисами без синхронных HTTP-вызовов.
-
-### Особенности фоновых служб:
-- Потокобезопасны
-- Работают асинхронно
-- Логируют каждый шаг
-- Корректно останавливаются при завершении приложения
+### Возможности фоновых сервисов:
+- Потокобезопасность
+- Асинхронные операции
+- Логирование на каждом шаге
+- Корректное завершение работы
 
 ---
 
 ## 🔐 Валидация
 
-Все поля в `EventDto` проходят валидацию:
-- `[Required]`
+Все поля `EventDto` проходят валидацию:
+- Атрибуты `[Required]`
 - Кастомная проверка: `StartAt < EndAt`
-- Сообщения на русском языке.
-- Защита от `null` и логических ошибок.
+- Сообщения об ошибках на русском языке
+- Защита от `null` и логических ошибок
 
 ---
 
-## ⚙️ JWT-конфигурация
+## ⚙️ Конфигурация JWT
 
 Аутентификация основана на JWT-токенах (Bearer). Настройки читаются из конфигурации каждого сервиса:
 
@@ -954,19 +793,21 @@ public enum BookingStatus
 }
 ```
 
-> 🔒 Безопасность секрета:
-> - На стенде разработки секреты хранятся в `appsettings.Development.json` — создайте данный файл в корневой папке каждого сервиса, взяв за основу `appsettings.json`.
-> - Для `Jwt.Secret` используйте любое случайное значение (минимум 32 символа).
-> - В продакшене секрет должен задаваться через защищённый источник:
->   - Переменные окружения (не через `appsettings.json`);
->   - Azure Key Vault, AWS Secrets Manager, HashiCorp Vault.
+> 🔒 **Безопасность:**
+> - Используйте случайное значение (минимум 32 символа) для `Jwt.Secret`
+> - В продакшене используйте переменные окружения или менеджер секретов (Azure Key Vault, AWS Secrets Manager, HashiCorp Vault)
+> - Все три сервиса должны использовать **одинаковые** `Secret`, `Issuer` и `Audience`
 
-## ⚙️ Seed-конфигурация
+---
 
-Начальное заполнение базы данных (seed) настраивается через `SeedOptions`. 
-Администраторы и системный пользователь (**anonymous**) создаются автоматически при запуске приложения, после применения миграций БД.
+## ⚙️ Конфигурация Seed
 
-Пример настройки в `appsettings.Development.json`
+Начальное заполнение базы данных настраивается через `SeedOptions`.
+Администраторы создаются автоматически, при запуске сервиса **UsersService**.
+
+Пример:
+
+**`appsettings.Development.json`:**
 ```json
 {
   "SeedOptions": {
@@ -977,65 +818,67 @@ public enum BookingStatus
 }
 ```
 
-Если пароль не указан, будет выброшено исключение.
-Администраторы с таким логином не создаются повторно.
+Если пароль не указан, выбрасывается исключение.
+Администраторы с одинаковым логином не пересоздаются.
 
 ---
 
-## 🧱 Тесты
+## ❌ Формат ответа об ошибках
 
-### Unit-тесты
+API возвращает ошибки в стандартизированном формате `ProblemDetails` (`application/problem+json`).
 
-Реализованы unit-тесты для:
-- сервисов `EventService`, `BookingService`, `UserService`, `BookingProcessingBackgroundService`.
-- сущностей `Event`, `Booking` и `User`.
-
-Запуск unit-тестов (в корне репозитория):
-
-```bash
-dotnet test EventMgtApi.UnitTests/EventMgtApi.UnitTests.csproj
+### Валидация:
+```json
+{
+  "title": "Ошибка валидации",
+  "status": 400,
+  "detail": "Обнаружены ошибки валидации входных данных.",
+  "instance": "/api/Events",
+  "errors": {
+    "Title": ["Заголовок обязателен."]
+  }
+}
 ```
 
-### Интеграционные тесты
-
-В проект включены интеграционные тесты (`EventMgtApi.IntegrationTests`), которые проверяют взаимодействие с базой данных через реальный `AppDbContext`.
-К интеграционным тестам также добавлены тесты на конкурентность.
-
-Для запуска интеграционных тестов требуется Docker — тестовый контейнер с PostgreSQL запускается автоматически через testcontainers.
-
-**Требования:**
-- Установленный Docker
-- .NET 10+ SDK (используется EF Core 10 — актуально на текущий момент)
-
-Запуск интеграционных тестов (в корне репозитория):
-
-```bash
-dotnet test EventMgtApi.IntegrationTests/EventMgtApi.IntegrationTests.csproj
+### Не найдено:
+```json
+{
+  "title": "Ресурс не найден",
+  "status": 404,
+  "detail": "Событие с ID 4cbde443-... не найдено.",
+  "instance": "/api/Events/4cbde443-..."
+}
 ```
 
-> 💡 При первом запуске Docker скачает образ `postgres:16-alpine`
-
-Запуск всех тестов сразу (в корне репозитория):
-
-```bash
-dotnet test
+### Внутренняя ошибка сервера:
+```json
+{
+  "title": "Внутренняя ошибка сервера",
+  "status": 500,
+  "detail": "Произошла ошибка при обработке запроса.",
+  "instance": "/api/Events/..."
+}
 ```
+
+- Все сообщения на русском языке
+- Централизованная обработка через middleware
+- Следует RFC 9110
 
 ---
 
-### ⚠️ Ограничения
+## ⚠️ Ограничения
 
-- Часовые пояса не обрабатываются (все даты в UTC).
-- Нет поддержки refresh-токенов.
+- Часовые пояса не обрабатываются (все даты в UTC)
+- Нет поддержки refresh-токенов
 
 ---
 
-### 🚧 Будущие улучшения
+## 🚧 Будущие улучшения
 
-- Сделать Docker-образ для каждого сервиса
 - Интеграция с email и платежами
-- Distributed Tracing (OpenTelemetry)
+- Распределённое трассирование (OpenTelemetry)
 - API Gateway (Ocelot / YARP)
+- Интеграционные тесты с Testcontainers
 
 ---
 
