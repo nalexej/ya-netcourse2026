@@ -150,39 +150,4 @@ public class EventsController : ControllerBase
         await _eventService.RemoveEventAsync(id);
         return NoContent();
     }
-
-    ///// <summary>
-    ///// Создаёт новую бронь на указанное событие.
-    ///// </summary>
-    ///// <param name="eventId">Идентификатор события, на которое создаётся бронь.</param>
-    ///// <param name="request">DTO с данными для создания брони (заглушка).</param>
-    ///// <returns>Информация о созданной брони.</returns>
-    ///// <response code="201">Бронь успешно создана. Возвращён объект и заголовок Location.</response>
-    ///// <response code="400">Событие уже началось/ некорректный запрос.</response>
-    ///// <response code="401">Требуется аутентификация.</response>
-    ///// <response code="404">Событие с указанным ID не найдено.</response>
-    ///// <response code="409">Нет доступных мест или превышен лимит броней.</response>
-    //[Authorize]
-    //[HttpPost("{eventId:guid}/book")]
-    //[ProducesResponseType(typeof(BookingResponseDto), StatusCodes.Status201Created)]
-    //[ProducesResponseType(StatusCodes.Status400BadRequest)] //событие уже началось
-    //[ProducesResponseType(StatusCodes.Status401Unauthorized)] //требует аутентификации
-    //[ProducesResponseType(StatusCodes.Status404NotFound)] // событие не найдено
-    //[ProducesResponseType(StatusCodes.Status409Conflict)] //нет доступных мест или превышен лимит броней
-    //public async Task<ActionResult<BookingResponseDto>> CreateBookingForEvent
-    //        (Guid eventId,
-    //        [FromBody] CreateBookingRequestDto request)
-    //{
-    //    if (eventId == Guid.Empty)
-    //        return BadRequest("Идентификатор события не может быть пустым.");
-
-    //    var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? throw new UnauthorizedAccessException());
-    //    var isAdmin = User.IsInRole("Admin");
-
-    //    var booking = await _bookingService.CreateBookingAsync(eventId, userId);
-
-    //    return Created(
-    //        Url.Action("GetBookingById", "Bookings", new { id = booking.Id }, Request.Scheme)!,
-    //        booking);
-    //}
 }

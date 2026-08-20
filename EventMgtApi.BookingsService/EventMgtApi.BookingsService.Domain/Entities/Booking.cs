@@ -41,16 +41,6 @@ public class Booking
     /// </summary>
     public DateTime? ProcessedAt { get; set; }
 
-    ///// <summary>
-    ///// Навигационное свойство: ссылка на связанное событие.
-    ///// </summary>
-    //public Event? Event { get; private set; } = null!;
-
-    ///// <summary>
-    ///// Навигационное свойство: ссылка на пользователя, создавшего бронь.
-    ///// </summary>
-    //public User? User { get; private set; } = null!;
-
     #endregion
 
     #region Constructors

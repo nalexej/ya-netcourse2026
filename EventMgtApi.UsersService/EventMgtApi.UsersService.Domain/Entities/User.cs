@@ -30,12 +30,6 @@ public class User
     /// </summary>
     public UserRole Role { get; set; } = UserRole.User;
 
-    ///// <summary>
-    ///// Навигационное свойство: список бронирований.
-    ///// </summary>
-    //public ICollection<Booking> Bookings { get; private set; } = [];
-
-
     #endregion
 
     #region Constructors

@@ -46,16 +46,6 @@ namespace EventMgtApi.EventsService.Domain.Entities
         /// </summary>
         public int AvailableSeats { get; set; }
 
-        ///// <summary>
-        ///// Маркер версии строки для оптимистичного контроля параллелизма.
-        ///// </summary>
-        //public byte[] RowVersion { get; set; } = [];
-
-        ///// <summary>
-        ///// Навигационное свойство: список бронирований.
-        ///// </summary>
-        //public ICollection<Booking> Bookings { get; private set; } = [];
-
         #endregion
 
         #region Constructors
@@ -89,31 +79,6 @@ namespace EventMgtApi.EventsService.Domain.Entities
                 EndAt = endAt,
                 TotalSeats = totalSeats,
                 AvailableSeats = totalSeats
-            };
-        }
-
-        /// <summary>
-        /// Создаёт событие без валидации — исключительно для нужд тестирования.
-        /// Позволяет задать произвольные значения свойств, включая недопустимые с точки зрения бизнес-логики.
-        /// </summary>
-        internal static Event CreateForTest(
-            Guid id,
-            string title,
-            DateTime startAt,
-            DateTime endAt,
-            int totalSeats,
-            int? availableSeats = null,
-            string? description = null)
-        {
-            return new Event
-            {
-                Id = id,
-                Title = title,
-                Description = description ?? string.Empty,
-                StartAt = startAt,
-                EndAt = endAt,
-                TotalSeats = totalSeats,
-                AvailableSeats = availableSeats ?? totalSeats
             };
         }
 
