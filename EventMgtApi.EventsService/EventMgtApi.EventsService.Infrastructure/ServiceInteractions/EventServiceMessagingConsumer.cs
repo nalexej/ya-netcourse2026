@@ -180,6 +180,21 @@ public class EventServiceMessagingConsumer : BackgroundService
             _logger.LogError(
                 "Событие {EventId} не найдено — бронь {BookingId} не может быть обработана",
                 confirmed.EventId, confirmed.BookingId);
+
+            var eventPublisher = _serviceProvider.GetRequiredService<IEventPublisher>();
+
+            var failedEvent = new BookingConfirmationFailed(
+                bookingId: confirmed.BookingId,
+                eventId: confirmed.EventId,
+                userId: confirmed.UserId
+            );
+
+            await eventPublisher.PublishAsync(
+                failedEvent,
+                key: confirmed.EventId.ToString(),
+                ct: ct
+            );
+
             return;
         }
 
