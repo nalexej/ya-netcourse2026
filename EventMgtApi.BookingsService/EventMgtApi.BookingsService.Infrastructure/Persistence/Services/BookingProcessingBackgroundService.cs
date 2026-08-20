@@ -157,7 +157,7 @@ public class BookingProcessingBackgroundService : BackgroundService
                 {
                     bkg.Reject();
                     await bookingRepository.SaveChangesAsync(stoppingToken);
-                    
+
                     // Освобождать места в EventsService не нужно: событие BookingConfirmed не было опубликовано,
                     // значит EventsService ещё не резервировал места (TryReserveSeats не вызывался).
                 }

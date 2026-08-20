@@ -95,19 +95,19 @@ public class BookingService : IBookingService
         booking.Cancel();
         await _bookingRepository.SaveChangesAsync(cancellationToken);
 
-            var cancelledEvent = new BookingCancelled(
-                bookingId: booking.Id,
-                eventId: booking.EventId,
-                userId: booking.UserId,
-                seatsCount: 1,
-                cancelledAt: booking.ProcessedAt!.Value
-            );
+        var cancelledEvent = new BookingCancelled(
+            bookingId: booking.Id,
+            eventId: booking.EventId,
+            userId: booking.UserId,
+            seatsCount: 1,
+            cancelledAt: booking.ProcessedAt!.Value
+        );
 
-            await _eventPublisher.PublishAsync(
-                cancelledEvent,
-                key: booking.EventId.ToString(),
-                ct: cancellationToken
-            );
+        await _eventPublisher.PublishAsync(
+            cancelledEvent,
+            key: booking.EventId.ToString(),
+            ct: cancellationToken
+        );
 
         return booking.ToDtoResponse();
     }
