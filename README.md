@@ -549,8 +549,7 @@ dotnet run --project EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web
     "ConsumerGroup": "events-service-group",
     "Topics": [
       "booking-confirmed",
-      "booking-cancelled",
-      "booking-confirmation-failed"
+      "booking-cancelled"
     ]
   },
   "Jwt": {
