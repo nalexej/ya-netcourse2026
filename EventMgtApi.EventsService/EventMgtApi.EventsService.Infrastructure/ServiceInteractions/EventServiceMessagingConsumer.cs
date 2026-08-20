@@ -115,7 +115,9 @@ public class EventServiceMessagingConsumer : BackgroundService
             "Получено сообщение из топика {Topic}, partition {Partition}, offset {Offset}",
             message.Topic, message.Partition, message.Offset);
 
-        var eventRepository = _serviceProvider.GetRequiredService<IEventRepository>();
+        using var scope = _serviceProvider.CreateScope();
+        var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
+        var processedBookingRepository = scope.ServiceProvider.GetRequiredService<IProcessedBookingRepository>();
 
         object? deserialized;
         try
@@ -141,15 +143,14 @@ public class EventServiceMessagingConsumer : BackgroundService
             return;
         }
 
-
         switch (deserialized)
         {
             case BookingConfirmed confirmed:
-                await ProcessBookingConfirmedAsync(confirmed, eventRepository, ct);
+                await ProcessBookingConfirmedAsync(confirmed, eventRepository, processedBookingRepository, ct);
                 break;
 
             case BookingCancelled cancelled:
-                await ProcessBookingCancelledAsync(cancelled, eventRepository, ct);
+                await ProcessBookingCancelledAsync(cancelled, eventRepository, processedBookingRepository, ct);
                 break;
 
             default:
@@ -161,8 +162,18 @@ public class EventServiceMessagingConsumer : BackgroundService
     private async Task ProcessBookingConfirmedAsync(
         BookingConfirmed confirmed,
         IEventRepository eventRepository,
+        IProcessedBookingRepository processedBookingRepository,
         CancellationToken ct)
     {
+        // Идемпотентность: проверяем, не обрабатывалось ли уже это бронирование
+        if (await processedBookingRepository.ExistsAsync(confirmed.EventId, confirmed.BookingId, "Confirmed", ct))
+        {
+            _logger.LogWarning(
+                "Бронь {BookingId} для события {EventId} уже обрабатывалась — пропускаем (идемпотентность).",
+                confirmed.BookingId, confirmed.EventId);
+            return;
+        }
+
         var @event = await eventRepository.GetByIdAsync(confirmed.EventId, ct);
         if (@event == null)
         {
@@ -180,9 +191,7 @@ public class EventServiceMessagingConsumer : BackgroundService
                 confirmed.EventId, confirmed.BookingId,
                 @event.AvailableSeats, confirmed.SeatsCount);
 
-            // Публикуем событие отмены подтверждения брони
-            using var scope = _serviceProvider.CreateScope();
-            var eventPublisher = scope.ServiceProvider.GetRequiredService<IEventPublisher>();
+            var eventPublisher = _serviceProvider.GetRequiredService<IEventPublisher>();
 
             var failedEvent = new BookingConfirmationFailed(
                 bookingId: confirmed.BookingId,
@@ -192,7 +201,7 @@ public class EventServiceMessagingConsumer : BackgroundService
 
             await eventPublisher.PublishAsync(
                 failedEvent,
-                key: confirmed.EventId.ToString(), // ключ = EventId для порядка по событию
+                key: confirmed.EventId.ToString(),
                 ct: ct
             );
 
@@ -200,6 +209,8 @@ public class EventServiceMessagingConsumer : BackgroundService
         }
 
         await eventRepository.SaveChangesAsync(ct);
+        await processedBookingRepository.AddAsync(confirmed.EventId, confirmed.BookingId, "Confirmed", ct);
+        await processedBookingRepository.SaveChangesAsync(ct);
 
         _logger.LogInformation(
             "Зарезервировано {Seats} мест для события {EventId} по брони {BookingId}",
@@ -209,8 +220,18 @@ public class EventServiceMessagingConsumer : BackgroundService
     private async Task ProcessBookingCancelledAsync(
         BookingCancelled cancelled,
         IEventRepository eventRepository,
+        IProcessedBookingRepository processedBookingRepository,
         CancellationToken ct)
     {
+        // Идемпотентность: проверяем, не обрабатывалось ли уже это бронирование
+        if (await processedBookingRepository.ExistsAsync(cancelled.EventId, cancelled.BookingId, "Cancelled", ct))
+        {
+            _logger.LogWarning(
+                "Бронь {BookingId} для события {EventId} уже обрабатывалась (Cancelled) — пропускаем (идемпотентность).",
+                cancelled.BookingId, cancelled.EventId);
+            return;
+        }
+
         var @event = await eventRepository.GetByIdAsync(cancelled.EventId, ct);
         if (@event == null)
         {
@@ -222,6 +243,8 @@ public class EventServiceMessagingConsumer : BackgroundService
 
         @event.ReleaseSeats(cancelled.SeatsCount);
         await eventRepository.SaveChangesAsync(ct);
+        await processedBookingRepository.AddAsync(cancelled.EventId, cancelled.BookingId, "Cancelled", ct);
+        await processedBookingRepository.SaveChangesAsync(ct);
 
         _logger.LogInformation(
             "Освобождено {Seats} мест для события {EventId} по отмене брони {BookingId}",
