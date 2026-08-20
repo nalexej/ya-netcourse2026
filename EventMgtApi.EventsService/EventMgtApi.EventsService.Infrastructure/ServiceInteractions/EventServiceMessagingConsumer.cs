@@ -247,9 +247,8 @@ public class EventServiceMessagingConsumer : BackgroundService
             return;
         }
 
-        await eventRepository.SaveChangesAsync(ct);
         await processedBookingRepository.AddAsync(confirmed.EventId, confirmed.BookingId, "Confirmed", ct);
-        await processedBookingRepository.SaveChangesAsync(ct);
+        await eventRepository.SaveChangesAsync(ct);
 
         _logger.LogInformation(
             "Зарезервировано {Seats} мест для события {EventId} по брони {BookingId}",
@@ -281,9 +280,8 @@ public class EventServiceMessagingConsumer : BackgroundService
         }
 
         @event.ReleaseSeats(cancelled.SeatsCount);
-        await eventRepository.SaveChangesAsync(ct);
         await processedBookingRepository.AddAsync(cancelled.EventId, cancelled.BookingId, "Cancelled", ct);
-        await processedBookingRepository.SaveChangesAsync(ct);
+        await eventRepository.SaveChangesAsync(ct);
 
         _logger.LogInformation(
             "Освобождено {Seats} мест для события {EventId} по отмене брони {BookingId}",
