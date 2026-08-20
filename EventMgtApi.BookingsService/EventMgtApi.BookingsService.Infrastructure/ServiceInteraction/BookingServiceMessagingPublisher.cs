@@ -1,7 +1,5 @@
 using Confluent.Kafka;
-using EventMgtApi.BookingsService.Application.ServiceInteraction;
-using EventMgtApi.BookingsService.Domain.Options;
-using EventMgtApi.Contracts.Events;
+using EventMgtApi.Contracts.Options;
 using EventMgtApi.Contracts.ServiceInteraction;
 using EventMgtApi.Contracts.ServiceInteraction.ServiceEvents;
 using Microsoft.Extensions.Logging;
@@ -9,13 +7,16 @@ using Microsoft.Extensions.Options;
 
 namespace EventMgtApi.BookingsService.Infrastructure.ServiceInteraction;
 
-public sealed class KafkaEventPublisher : IEventPublisher
+/// <summary>
+/// Издатель сообщений службы бронирования.
+/// </summary>
+public sealed class BookingServiceMessagingPublisher : IEventPublisher
 {
     private readonly IProducer<string, string> _producer;
-    private readonly ILogger<KafkaEventPublisher> _logger;
+    private readonly ILogger<BookingServiceMessagingPublisher> _logger;
     private bool _disposed;
 
-    public KafkaEventPublisher(IOptions<KafkaOptions> kafkaOptions, ILogger<KafkaEventPublisher> logger)
+    public BookingServiceMessagingPublisher(IOptions<KafkaOptions> kafkaOptions, ILogger<BookingServiceMessagingPublisher> logger)
     {
         _logger = logger;
 
@@ -30,7 +31,7 @@ public sealed class KafkaEventPublisher : IEventPublisher
 
     public async Task PublishAsync<T>(T eventMessage, string? key = null, CancellationToken ct = default) where T : class
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(KafkaEventPublisher));
+        if (_disposed) throw new ObjectDisposedException(nameof(BookingServiceMessagingPublisher));
 
         var json = System.Text.Json.JsonSerializer.Serialize(eventMessage);
         var messageKey = key ?? Guid.NewGuid().ToString();
@@ -50,21 +51,12 @@ public sealed class KafkaEventPublisher : IEventPublisher
             result.Topic, result.Partition, result.Offset);
     }
 
-    public Task PublishBookingConfirmedAsync(
-        BookingConfirmed bookingConfirmed,
-        CancellationToken ct = default)
-    {
-        return PublishAsync(
-            bookingConfirmed,
-            key: bookingConfirmed.EventId.ToString(),
-            ct: ct);
-    }
-
     private static string GetTopicForMessage<T>(T eventMessage) where T : class
     {
         return eventMessage switch
         {
             BookingConfirmed => ServiceInteractionConstants.BookingConfirmedTopic,
+            BookingCancelled => ServiceInteractionConstants.BookingCancelledTopic,
             _ => throw new ArgumentException($"Неизвестный тип события: {typeof(T).Name}")
         };
     }
@@ -77,6 +69,6 @@ public sealed class KafkaEventPublisher : IEventPublisher
         _producer.Dispose();
         _disposed = true;
 
-        _logger.LogInformation("KafkaEventPublisher остановлен и освобождён.");
+        _logger.LogInformation("BookingServiceMessagingPublisher остановлен и освобождён.");
     }
 }

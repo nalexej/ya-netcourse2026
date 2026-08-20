@@ -1,8 +1,8 @@
 using EventMgtApi.BookingsService.Application.Persistence;
-using EventMgtApi.BookingsService.Application.ServiceInteraction;
 using EventMgtApi.BookingsService.Infrastructure.BackgroundServices;
 using EventMgtApi.BookingsService.Infrastructure.Repositories;
 using EventMgtApi.BookingsService.Infrastructure.ServiceInteraction;
+using EventMgtApi.Contracts.ServiceInteraction;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,9 +14,7 @@ namespace EventMgtApi.BookingsService.Infrastructure.DependencyInjection
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
             // Регистрация репозиториев
-            //services.AddScoped<IEventRepository, EventRepository>();
             services.AddScoped<IBookingRepository, BookingRepository>();
-            //services.AddScoped<IUserRepository, UserRepository>();
 
             // Регистрация DbContext
             services.AddDbContext<BookingDbContext>(options =>
@@ -24,10 +22,9 @@ namespace EventMgtApi.BookingsService.Infrastructure.DependencyInjection
 
             // Регистрация фонового сервиса
             services.AddHostedService<BookingProcessingBackgroundService>();
-            services.AddSingleton<IEventPublisher, KafkaEventPublisher>();
+            services.AddSingleton<IEventPublisher, BookingServiceMessagingPublisher>();
 
-            // Регистрация хеширования паролей
-            //services.AddScoped<IPasswordHasher, PasswordHasher>();
+            services.AddHostedService<BookingServiceMessagingConsumer>();
 
             // Регистрация JWT-параметров и сервиса
             //var jwtSection = configuration.GetSection(JwtOptions.SectionName);

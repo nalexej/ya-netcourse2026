@@ -1,4 +1,4 @@
-﻿namespace EventMgtApi.BookingsService.Application.ServiceInteraction
+﻿namespace EventMgtApi.Contracts.ServiceInteraction
 {
     public interface IEventPublisher : IDisposable
     {

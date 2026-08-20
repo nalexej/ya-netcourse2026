@@ -1,6 +1,6 @@
 ﻿using EventMgtApi.BookingsService.Application.Persistence;
-using EventMgtApi.BookingsService.Application.ServiceInteraction;
 using EventMgtApi.Contracts.Enums;
+using EventMgtApi.Contracts.ServiceInteraction;
 using EventMgtApi.Contracts.ServiceInteraction.ServiceEvents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -150,7 +150,7 @@ public class BookingProcessingBackgroundService : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
 
-                // перечитываем на всякий случай
+                // Перечитываем бронь  в Rejected, чтобы EventsService никогда не увидел несуществующее подтверждение.
                 var bkg = await bookingRepository.GetByIdAsync(bookingId, stoppingToken);
 
                 if (bkg != null)
@@ -158,7 +158,8 @@ public class BookingProcessingBackgroundService : BackgroundService
                     bkg.Reject();
                     await bookingRepository.SaveChangesAsync(stoppingToken);
                     
-                    // ToDo: тут освободить место
+                    // Освобождать места в EventsService не нужно: событие BookingConfirmed не было опубликовано,
+                    // значит EventsService ещё не резервировал места (TryReserveSeats не вызывался).
                 }
                 _logger.LogError(ex, "Бронь {BookingId} отклонена в ходе обработки возникшей ошибки.", bookingId);
             }

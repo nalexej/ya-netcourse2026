@@ -1,7 +1,7 @@
-﻿using Confluent.Kafka;
+﻿
+using Confluent.Kafka;
 using Confluent.Kafka.Admin;
-using EventMgtApi.Contracts.ServiceInteraction;
-using EventMgtApi.EventsService.Domain.Options;
+using EventMgtApi.Contracts.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,18 +10,18 @@ namespace EventMgtApi.EventsService.Infrastructure.ServiceInteractions;
 
 public class KafkaTopicInitializer : IHostedService
 {
-    private readonly IOptions<KafkaConsumerOptions> _options;
+    private readonly IOptions<KafkaOptions> _options;
     private readonly ILogger<KafkaTopicInitializer> _logger;
 
     public KafkaTopicInitializer(
-        IOptions<KafkaConsumerOptions> options,
+        IOptions<KafkaOptions> options,
         ILogger<KafkaTopicInitializer> logger)
     {
         _options = options;
         _logger = logger;
     }
 
-    public Task StartAsync(CancellationToken ct)
+    public async Task StartAsync(CancellationToken ct)
     {
         try
         {
@@ -32,38 +32,51 @@ public class KafkaTopicInitializer : IHostedService
 
             using var adminClient = new AdminClientBuilder(config).Build();
 
-            var topicName = ServiceInteractionConstants.BookingConfirmedTopic;
+            var topics = _options.Value.Topics;
 
-            // Проверяем, существует ли топик
-            var metadata = adminClient.GetMetadata(topicName, TimeSpan.FromSeconds(5));
-            var topic = metadata.Topics.FirstOrDefault(t => t.Topic == topicName);
-
-            if (topic != null && topic.Partitions.Count > 0)
+            if (topics == null || topics.Length == 0)
             {
-                _logger.LogInformation("Топик '{Topic}' уже существует.", topicName);
-                return Task.CompletedTask;
+                _logger.LogWarning("Список топиков для инициализации пуст — пропускаем.");
+                return;
             }
 
-            // Создаём топик
-            adminClient.CreateTopicsAsync(new[]
+            foreach (var topicName in topics)
             {
+                await InitializeTopicAsync(adminClient, topicName, ct);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Не удалось инициализировать Kafka-топики. Это не критично.");
+        }
+    }
+
+    private async Task InitializeTopicAsync(
+        IAdminClient adminClient,
+        string topicName,
+        CancellationToken ct)
+    {
+        var existingTopics = adminClient.GetMetadata(topicName, TimeSpan.FromSeconds(5))
+            .Topics
+            .Select(t => t.Topic)
+            .ToList();
+
+        if (existingTopics.Contains(topicName))
+        {
+            _logger.LogInformation("Топик '{Topic}' уже существует.", topicName);
+            return;
+        }
+        // Создаём топик
+        await adminClient.CreateTopicsAsync(new[]
+        {
                 new TopicSpecification
                 {
                     Name = topicName,
                     NumPartitions = 3,
                     ReplicationFactor = 1
                 }
-            }).Wait(ct);
-
-            _logger.LogInformation("Топик '{Topic}' создан.", topicName);
-        }
-        catch (Exception ex)
-        {
-            // Не валю запуск — топик может быть создан позже или уже существующий
-            _logger.LogWarning(ex, "Не удалось инициализировать топик '{Topic}'. Это не критично.", ServiceInteractionConstants.BookingConfirmedTopic);
-        }
-
-        return Task.CompletedTask;
+        });
+        _logger.LogInformation("Топик '{Topic}' создан.", topicName);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;

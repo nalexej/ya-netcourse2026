@@ -1,6 +1,8 @@
+using EventMgtApi.Contracts.ServiceInteraction;
 using EventMgtApi.EventsService.Application.Persistence;
 using EventMgtApi.EventsService.Infrastructure.Persistence;
 using EventMgtApi.EventsService.Infrastructure.Repositories;
+using EventMgtApi.EventsService.Infrastructure.ServiceInteraction;
 using EventMgtApi.EventsService.Infrastructure.ServiceInteractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -13,25 +15,15 @@ public static class InfrastructureServiceCollectionExtensions
     {
         // Регистрация репозиториев
         services.AddScoped<IEventRepository, EventRepository>();
-        //services.AddScoped<IBookingRepository, BookingRepository>();
-        //services.AddScoped<IUserRepository, UserRepository>();
 
         // Регистрация DbContext
         services.AddDbContext<EventDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        // Регистрация фонового сервиса
-        //services.AddHostedService<BookingProcessingBackgroundService>();
-        services.AddHostedService<KafkaConsumerBackgroundService>();
+        // Регистрация сервисов
         services.AddHostedService<KafkaTopicInitializer>();
-
-        // Регистрация хеширования паролей
-        //services.AddScoped<IPasswordHasher, PasswordHasher>();
-
-        // Регистрация JWT-параметров и сервиса
-        //var jwtSection = configuration.GetSection(JwtOptions.SectionName);
-        //services.Configure<JwtOptions>(options => jwtSection.Bind(options));
-        //services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddHostedService<EventServiceMessagingConsumer>();
+        services.AddSingleton<IEventPublisher, EventServiceMessagingPublisher>();
 
         return services;
     }

@@ -5,6 +5,8 @@ using EventMgtApi.BookingsService.Domain.Entities;
 using EventMgtApi.BookingsService.Domain.Exceptions;
 using EventMgtApi.BookingsService.Domain.Options;
 using EventMgtApi.Contracts.Bookings.DTOs;
+using EventMgtApi.Contracts.ServiceInteraction;
+using EventMgtApi.Contracts.ServiceInteraction.ServiceEvents;
 using Microsoft.Extensions.Options;
 
 namespace EventMgtApi.BookingsService.Application.Services;
@@ -16,13 +18,16 @@ public class BookingService : IBookingService
 {
     private readonly IBookingRepository _bookingRepository;
     private readonly BookingOptions _bookingOptions;
+    private readonly IEventPublisher _eventPublisher;
 
     public BookingService(
         IBookingRepository bookingRepository,
-        IOptions<BookingOptions> bookingOptionsAccessor)
+        IOptions<BookingOptions> bookingOptionsAccessor,
+        IEventPublisher eventPublisher)
     {
         _bookingRepository = bookingRepository;
         _bookingOptions = bookingOptionsAccessor.Value;
+        _eventPublisher = eventPublisher;
     }
 
     /// <inheritdoc />
@@ -37,48 +42,10 @@ public class BookingService : IBookingService
         if (userId == Guid.Empty)
             throw new ArgumentException("Идентификатор пользователя не может быть пустым.", nameof(userId));
 
-        //return await _eventRepository.ExecuteWithConcurrencyRetryAsync(
-        //    async () =>
-        //    {
-        //        // БЛОКИРУЕМ строку события — SELECT ... FOR UPDATE
-        //        var @event = await _eventRepository.GetWithLockAsync(eventId, cancellationToken)
-        //            ?? throw new NotFoundException($"Событие с ID {eventId} не найдено.");
-
-        //        // Проверка: событие не началось
-        //        if (@event.StartAt <= DateTime.UtcNow)
-        //            throw new BookingPastEventException("Нельзя забронировать событие, которое уже началось.");
-
-        //        if (@event.EndAt < DateTime.UtcNow)
-        //            throw new BookingPastEventException("Нельзя забронировать событие, которое уже завершилось.");
-
-        //        // Проверка лимита активных броней
-        //        int activeCount = await _bookingRepository.GetActiveBookingsCountAsync(userId, cancellationToken);
-        //        if (activeCount >= _bookingOptions.MaxActiveBookings)
-        //            throw new TooManyActiveBookingsException(
-        //                $"У пользователя уже есть {activeCount} активных броней. Предел: {_bookingOptions.MaxActiveBookings}.");
-
-        //        // Резервируем место (теперь безопасно — строка заблокирована)
-        //        if (!@event.TryReserveSeats())
-        //            throw new NoAvailableSeatsException("Нет доступных мест для данного события.");
-
-        //        // Создаём бронь
-        //        var booking = new Booking(eventId, userId);
-        //        await _bookingRepository.AddAsync(booking, cancellationToken);
-        //        await _bookingRepository.SaveChangesAsync(cancellationToken);
-
-        //        return booking.ToDtoResponse();
-        //    },
-        //    maxRetries: 3,
-        //    cancellationToken);
-
         int activeCount = await _bookingRepository.GetActiveBookingsCountAsync(userId, cancellationToken);
         if (activeCount >= _bookingOptions.MaxActiveBookings)
             throw new TooManyActiveBookingsException(
                 $"У пользователя уже есть {activeCount} активных броней. Предел: {_bookingOptions.MaxActiveBookings}.");
-
-        //// Резервируем место (теперь безопасно — строка заблокирована)
-        //if (!@event.TryReserveSeats())
-        //    throw new NoAvailableSeatsException("Нет доступных мест для данного события.");
 
         // Создаём бронь
         var booking = new Booking(eventId, userId);
@@ -86,8 +53,6 @@ public class BookingService : IBookingService
         await _bookingRepository.SaveChangesAsync(cancellationToken);
 
         return booking.ToDtoResponse();
-
-
     }
 
     /// <inheritdoc />
@@ -127,19 +92,23 @@ public class BookingService : IBookingService
             throw new ForbiddenException(
                 "Недостаточно прав для отмены этой брони. Вы можете отменить только свою бронь.");
 
-        //if (booking.EventId != Guid.Empty && booking.Event.StartAt <= DateTime.UtcNow)
-        //    throw new BookingPastEventException("Нельзя отменить бронь на прошедшее событие.");
-
         booking.Cancel();
         await _bookingRepository.SaveChangesAsync(cancellationToken);
 
-        //var eventId = booking.EventId;
-        //var evt = await _eventRepository.GetByIdAsync(eventId, cancellationToken)
-        //    ?? throw new NotFoundException($"Событие с ID {eventId} не найдено.");
-        //evt.ReleaseSeats();
-        //await _eventRepository.SaveChangesAsync(cancellationToken);
+            var cancelledEvent = new BookingCancelled(
+                bookingId: booking.Id,
+                eventId: booking.EventId,
+                userId: booking.UserId,
+                seatsCount: 1,
+                cancelledAt: booking.ProcessedAt!.Value
+            );
+
+            await _eventPublisher.PublishAsync(
+                cancelledEvent,
+                key: booking.EventId.ToString(),
+                ct: cancellationToken
+            );
 
         return booking.ToDtoResponse();
     }
-
 }

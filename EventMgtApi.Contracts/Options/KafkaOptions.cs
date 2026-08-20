@@ -1,9 +1,9 @@
-namespace EventMgtApi.EventsService.Domain.Options;
+namespace EventMgtApi.Contracts.Options;
 
 /// <summary>
-/// Параметры конфигурации Kafka для подписчика.
+/// Параметры конфигурации Kafka
 /// </summary>
-public class KafkaConsumerOptions
+public class KafkaOptions
 {
     public const string SectionName = "Kafka";
 
@@ -16,4 +16,9 @@ public class KafkaConsumerOptions
     /// Имя группы потребителей. Сообщения внутри группы распределяются между экземплярами.
     /// </summary>
     public string ConsumerGroup { get; set; } = "events-service-group";
+
+    /// <summary>
+    /// Список имён Kafka-топиков, которые нужно инициализировать.
+    /// </summary>
+    public string[] Topics { get; set; } = Array.Empty<string>();
 }
