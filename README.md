@@ -741,103 +741,116 @@ POST /api/events/event-id/book
 Структура папок отражает слои приложения, что упрощает масштабирование, тестирование и поддержку.
 
 ```
-EventMgtService.sln
-├── EventMgtApi.Domain/           # Бизнес-ядро: сущности, интерфейсы, исключения
-│   ├── Entities/
-│   │   ├── Event.cs             # Модель события (с TotalSeats, AvailableSeats)
-│   │   └── Booking.cs           # Модель бронирования
-│   │   └── User.cs           # Модель пользователя
-│   ├── Enums/
-│   │   └── BookingStatus.cs     # Статусы брони: Pending, Confirmed, Rejected
-│   ├── Exceptions/
-│       ├── BookingPastEventException.cs # Ошибка отмены бронирования прошедшего события (400)
-│       ├── ForbiddenException.cs # Ошибка недостаточности прав доступа (403)
-│       ├── NoAvailableSeatsException # Ошибка овербукинга (409)
-│       ├── NotFoundException.cs # Ошибка "не найдено" (404)
-│       ├── TooManyActiveBookingsException.cs # Превышен лимит активных броней пользователя (409)
-│       └── ValidationException.cs # Ошибка валидации (400)
+HomeWork/
+├── EventMgtService.sln                    
+├── docker-compose.yml                     
 │
-├── EventMgtApi.Application/      # Логика приложения: сервисы, DTO, маппинг
-│   ├── Abstractions/
-│   │   ├── Persistence/
-│   │   │   ├── Repositories/
-│   │   │       ├── IEventRepository.cs  # Абстракция доступа к событиям
-│   │   │       └── IBookingRepository.cs # Абстракция доступа к броням
-│   │   │       └── IUserRepository.cs # Абстракция доступа к пользователям
-│   │   └── Services/
-│   │       ├── IEventService.cs     # Интерфейс управления событиями
-│   │       ├── IBookingService.cs   # Интерфейс управления бронями
-│   │       ├── IUserService.cs   # Интерфейс управления пользователям
-│   │       └── ISeedService.cs   # Интерфейс начальным заполнением БД
-│   ├── Events/
-│   │   ├── EventService.cs      # Реализация бизнес-логики событий
-│   │   ├── DTOs/
-│   │   │   ├── EventDto.cs          # DTO для создания/обновления события
-│   │   │   ├── EventDtoResponse.cs  # DTO ответа с Id
-│   │   │   └── PaginatedResult.cs   # Обобщённый ответ с пагинацией
-│   │   └── Extensions/
-│   │       └── EventMappingExtensions.cs # Методы ToDtoResponse(), ToDtoList()
-│   ├── Bookings/
-│   │   ├── BookingService.cs    # Логика создания и получения броней (с SemaphoreSlim)
-│   │   ├── DTOs/
-│   │   │   ├── BookingResponseDto.cs # DTO статуса брони
-│   │   │   └── CreateBookingRequestDto.cs # Пустой DTO для бронирования
-│   │   └── Extensions/
-│   │       └── BookingsMappingExtensions.cs # Метод ToDtoResponse()
-│   ├── Users/
-│   │   ├── UserService.cs      # Реализация бизнес-логики управления пользователями
-│   │   ├── SeedService.cs      # Начальное заполнение БД
-│   │   ├── DTOs/
-│   │       ├── UserDtos.cs          # DTO для регистрации/аутентификации пользователя
-│   │       
-│   └── DependencyInjection/
-│       ├── ApplicationServiceCollectionExtensions.cs    # Регистрация сервисов уровня приложения
-│
-├── EventMgtApi.Infrastructure/   # Внешние реализации
-│   ├── Persistence/
-│   │   ├── AppDbContext.cs      # Контекст базы данных
-│   │   ├── Configurations/      # Конфигурации объектов в базе данных
-│   │   │   ├── BookingConfiguration.cs # Бронирования
-│   │   │   └── EventConfiguration.cs # События
-│   │   ├── Migrations/          # Миграции EF Core
-│   │   └── Repositories/
-│   │       ├── EventRepository.cs  # Реализация репозитория для событий
-│   │       └── BookingRepository.cs # Реализация репозитория для броней
+├── EventMgtApi.Contracts/                 # разделяемые контракты
+│   ├── EventMgtApi.Contracts.csproj
+│   ├── Users/DTOs/
+│   │   └── UserDtos.cs
+│   ├── Events/DTOs/
+│   │   ├── EventDto.cs
+│   │   ├── EventDtoResponse.cs
+│   │   └── PaginatedResult.cs
+│   ├── Bookings/DTOs/
+│   │   ├── BookingResponseDto.cs
+│   │   └── CreateBookingRequestDto.cs
 │   └── Services/
-│   │   └── BookingProcessingBackgroundService.cs # Обработка Pending → Confirmed (с SemaphoreSlim)
-│   └── DependencyInjection/
-│       ├── InfrastructureServiceCollectionExtensions.cs    # Регистрация сервисов уровня инфраструктуры
+│       ├── IUserService.cs
+│       ├── IEventService.cs
+│       ├── IBookingService.cs
+│       ├── IJwtTokenService.cs
+│       └── IPasswordHasher.cs
 │
-├── EventMgtApi.Web/              # Входная точка API (Presentation Layer)
-│   ├── Controllers/
-│   │   ├── EventsController.cs  # Обработка /api/events
-│   │   ├── BookingsController.cs # Обработка /api/bookings
-│   │   └── AuthController.cs # Обработка /api/auth
-│   ├── Middleware/
-│   │   └── GlobalExceptionHandlingMiddleware.cs # Централизованная обработка ошибок
-│   ├── Filters/
-│   │   └── ThrowValidationExceptionFilter.cs # Преобразует ModelState в исключение
-│   │   └── RemoveAuthForAnonymousOperations.cs # Фильтр операций Swagger
-│   └── Extensions/
-│   │    ├── ApplicationBuilderExtensions.cs # Метод UseGlobalExceptionHandling()
-│   │    └── ServiceCollectionExtensions.cs # Методы регистрации сервисов
-│   │
-│   ├── Program.cs                # Настройка DI, слоёв, маршрутов, Swagger
+├── EventMgtApi.UsersService/              # сервис пользователей
+│   ├── EventMgtApi.UsersService.Domain/
+│   │   ├── Entities/User.cs
+│   │   ├── Enums/UserRole.cs
+│   │   ├── Exceptions/
+│   │   │   ├── InvalidCredentialsException.cs
+│   │   │   └── ValidationException.cs
+│   │   └── EventMgtApi.UsersService.Domain.csproj
+│   ├── EventMgtApi.UsersService.Application/
+│   │   ├── Users/UserService.cs
+│   │   ├── Users/SeedService.cs
+│   │   ├── DependencyInjection/
+│   │   │   └── ApplicationServiceCollectionExtensions.cs
+│   │   └── EventMgtApi.UsersService.Application.csproj
+│   ├── EventMgtApi.UsersService.Infrastructure/
+│   │   ├── Persistence/UserDbContext.cs
+│   │   ├── Persistence/Configurations/UserConfiguration.cs
+│   │   ├── Persistence/Repositories/UserRepository.cs
+│   │   ├── Services/JwtTokenService.cs
+│   │   ├── Services/PasswordHasher.cs
+│   │   ├── DependencyInjection/InfrastructureServiceCollectionExtensions.cs
+│   │   └── EventMgtApi.UsersService.Infrastructure.csproj
+│   └── EventMgtApi.UsersService.Web/
+│       ├── Controllers/AuthController.cs
+│       ├── Program.cs
+│       ├── appsettings.json
+│       ├── EventMgtApi.UsersService.Web.csproj
+│       └── Middleware/ (исключить — будет общее)
 │
-├── EventMgtApi.UnitTests/        # Юнит-тесты
-│   ├── EventServiceTests.cs
-│   ├── BookingServiceTests.cs
-│   ├── UserServiceTests.cs
-│   ├── EventTests.cs
-│   ├── BookingTests.cs
-│   └── TestDataFactory.cs
+├── EventMgtApi.EventsService/             # сервис событий
+│   ├── EventMgtApi.EventsService.Domain/
+│   │   ├── Entities/Event.cs
+│   │   ├── Exceptions/
+│   │   │   ├── NotFoundException.cs
+│   │   │   ├── ValidationException.cs
+│   │   │   └── NoAvailableSeatsException.cs
+│   │   └── EventMgtApi.EventsService.Domain.csproj
+│   ├── EventMgtApi.EventsService.Application/
+│   │   ├── Events/EventService.cs
+│   │   ├── Events/Extensions/EventMappingExtensions.cs
+│   │   ├── DependencyInjection/ApplicationServiceCollectionExtensions.cs
+│   │   └── EventMgtApi.EventsService.Application.csproj
+│   ├── EventMgtApi.EventsService.Infrastructure/
+│   │   ├── Persistence/EventDbContext.cs
+│   │   ├── Persistence/Configurations/EventConfiguration.cs
+│   │   ├── Persistence/Repositories/EventRepository.cs
+│   │   ├── DependencyInjection/InfrastructureServiceCollectionExtensions.cs
+│   │   └── EventMgtApi.EventsService.Infrastructure.csproj
+│   └── EventMgtApi.EventsService.Web/
+│       ├── Controllers/EventsController.cs
+│       ├── Program.cs
+│       ├── appsettings.json
+│       ├── EventMgtApi.EventsService.Web.csproj
+│       └── Middleware/ (исключить)
 │
-├── EventMgtApi.IntegrationTests/ # Интеграционные тесты
-│   ├── DatabaseFixture.cs
-│   ├── EventRepositoryTests.cs
-│   ├── BookingRepositoryTests.cs
-│   ├── CommonTests.cs
-│   └── ConcurrentTests.cs
+├── EventMgtApi.BookingsService/           # сервис броней
+│   ├── EventMgtApi.BookingsService.Domain/
+│   │   ├── Entities/Booking.cs
+│   │   ├── Enums/BookingStatus.cs
+│   │   ├── Exceptions/
+│   │   │   ├── NotFoundException.cs
+│   │   │   ├── BookingPastEventException.cs
+│   │   │   ├── ForbiddenException.cs
+│   │   │   ├── TooManyActiveBookingsException.cs
+│   │   │   └── NoAvailableSeatsException.cs
+│   │   ├── Options/BookingOptions.cs
+│   │   └── EventMgtApi.BookingsService.Domain.csproj
+│   ├── EventMgtApi.BookingsService.Application/
+│   │   ├── Bookings/BookingService.cs
+│   │   ├── Bookings/Extensions/BookingsMappingExtensions.cs
+│   │   ├── DependencyInjection/ApplicationServiceCollectionExtensions.cs
+│   │   └── EventMgtApi.BookingsService.Application.csproj
+│   ├── EventMgtApi.BookingsService.Infrastructure/
+│   │   ├── Persistence/BookingDbContext.cs
+│   │   ├── Persistence/Configurations/BookingConfiguration.cs
+│   │   ├── Persistence/Repositories/BookingRepository.cs
+│   │   ├── BackgroundServices/BookingProcessingBackgroundService.cs
+│   │   ├── DependencyInjection/InfrastructureServiceCollectionExtensions.cs
+│   │   └── EventMgtApi.BookingsService.Infrastructure.csproj
+│   └── EventMgtApi.BookingsService.Web/
+│       ├── Controllers/BookingsController.cs
+│       ├── Program.cs
+│       ├── appsettings.json
+│       ├── EventMgtApi.BookingsService.Web.csproj
+│       └── Middleware/ (исключить)
+│
+├── EventMgtApi.UnitTests/                 
+├── EventMgtApi.IntegrationTests/          
 │
 └── docker-compose.yml            # Конфигурация Docker Compose
 ```
