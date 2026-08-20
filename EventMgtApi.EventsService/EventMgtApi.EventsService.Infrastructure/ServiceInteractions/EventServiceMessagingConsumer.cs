@@ -198,6 +198,30 @@ public class EventServiceMessagingConsumer : BackgroundService
             return;
         }
 
+        // Проверка: дата начала события в прошлом
+        if (@event.StartAt <= DateTime.UtcNow) 
+        {
+            _logger.LogWarning(
+                "Нельзя забронировать событие {EventId}, дата начала которого в прошлом. Бронь {BookingId}. ",
+                confirmed.EventId, confirmed.BookingId);
+
+            var eventPublisher = _serviceProvider.GetRequiredService<IEventPublisher>();
+
+            var failedEvent = new BookingConfirmationFailed(
+                bookingId: confirmed.BookingId,
+                eventId: confirmed.EventId,
+                userId: confirmed.UserId
+            );
+
+            await eventPublisher.PublishAsync(
+                failedEvent,
+                key: confirmed.EventId.ToString(),
+                ct: ct
+            );
+
+            return;
+        }
+
         if (!@event.TryReserveSeats(confirmed.SeatsCount))
         {
             _logger.LogWarning(
