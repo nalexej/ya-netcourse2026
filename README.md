@@ -98,6 +98,23 @@ API предоставляет полный цикл **CRUD**:
 
 #### Настройка seed-администраторов
 
+##### Если запускаете в докере
+
+Для настройки seed-админа в докере (перед выполнением **docker compose up**), необходимо задать переменные окружения: SEED_ADMIN_LOGIN и SEED_ADMIN_PASSWORD.
+
+Указанные переменные можно задать, например, в файле .env, который должен находиться в одной папке с docker-compose.yml:
+
+**`.env` (не коммитится):**
+```bash
+SEED_ADMIN_LOGIN=admin
+SEED_ADMIN_PASSWORD=admin1
+```
+В качестве примера в репозиторий помещен файл .env.example.
+
+В продакшене данные переменные устанавливаются в окружении хоста или в CI/CD pipeline, .
+
+##### Если запускаете вручную
+
 Логины и пароли администраторов хранятся в `appsettings.Development.json` (не коммитятся в git).
 
 **`appsettings.Development.json` (не коммитится):**
@@ -362,6 +379,7 @@ HomeWork/
 │       └── EventMgtApi.BookingsService.Web.csproj
 │
 └── docker-compose.yml                     # 🐳 PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
+└── .env.example                     # пример задания переменных окружения (seed-администратор и др)
 ```
 
 ---
@@ -427,6 +445,7 @@ HomeWork/
 ```bash
 docker compose up -d --build
 ```
+>ВАЖНО: перед запуском установите переменные окружения SEED_ADMIN_LOGIN и SEED_ADMIN_PASSWORD (см. раздел **Настройка seed-администраторов**).
 
 Это соберёт Dockerfile каждого сервиса и запустит весь стек:
 
