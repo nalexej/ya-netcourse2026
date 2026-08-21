@@ -130,7 +130,7 @@ services:
       - Kafka__ConsumerGroup=events-service-group
       - $0booking-confirmed
       - $0booking-cancelled
-      - Jwt__Secret=super-secret-key-for-jwt-token-generation
+      - Jwt__Secret=${JWT_SECRET_KEY}
       - Jwt__Issuer=EventMgtApi.UsersService
       - Jwt__Audience=EventMgtApi
     depends_on:
@@ -155,7 +155,7 @@ services:
       - Kafka__ConsumerGroup=bookings-service-group
       - $0booking-confirmation-failed
       - BookingOptions__MaxActiveBookings=10
-      - Jwt__Secret=super-secret-key-for-jwt-token-generation
+      - Jwt__Secret=${JWT_SECRET_KEY}
       - Jwt__Issuer=EventMgtApi.UsersService
       - Jwt__Audience=EventMgtApi
     depends_on:
@@ -176,7 +176,7 @@ services:
       - "7001:8080"
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres-users;Port=5432;Database=users_db;Username=postgres;Password=postgres
-      - Jwt__Secret=super-secret-key-for-jwt-token-generation
+      - Jwt__Secret=${JWT_SECRET_KEY}
       - Jwt__Issuer=EventMgtApi.UsersService
       - Jwt__Audience=EventMgtApi
       - SeedOptions__Admins__0__Login=${SEED_ADMIN_LOGIN}
