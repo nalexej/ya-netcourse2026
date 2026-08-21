@@ -1,26 +1,197 @@
-# PostgreSQL для EventApi — совпадает с ConnectionStrings:DefaultConnection в appsettings.json
-# Запуск из корня репозитория: docker compose up -d
-# Остановка: docker compose down
-# Данные сохраняются в именованном томе eventapi_pgdata
-
 services:
-  postgres:
+
+  # ─────────────────────────── Инфраструктура обмена сообщениями ───────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: eventapi-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 2181 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eventapi-network
+      
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: eventapi-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      # Внешний listener для подключения с хоста (например, из dotnet run локально).
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Два listener'а: INTERNAL — для сервисов внутри сети Docker, EXTERNAL — для хоста.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    networks:
+      - eventapi-network
+      
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      - kafka      
+    networks:
+      - eventapi-network
+      
+  # ─────────────────────────── Базы данных (по одной на сервис) ───────────────────────────
+  postgres-users:
     image: postgres:16-alpine
-    container_name: eventapi-postgres
+    container_name: users-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: eventapi
+      POSTGRES_DB: users_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - eventapi_pgdata:/var/lib/postgresql/data
+      - users_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d eventapi"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d users_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - eventapi-network
+      
+  postgres-events:
+    image: postgres:16-alpine
+    container_name: events-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: events_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - events_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d events_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eventapi-network
+      
+  postgres-bookings:
+    image: postgres:16-alpine
+    container_name: bookings-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bookings_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - bookings_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bookings_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eventapi-network
+      
+  events-service:
+    build:
+      context: .
+      dockerfile: EventMgtApi.EventsService/EventMgtApi.EventsService.Web/Dockerfile
+    container_name: events-service
+    restart: unless-stopped
+    ports:
+      - "7002:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=events-postgres;Port=5432;Database=events_db;Username=postgres;Password=postgres
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__ConsumerGroup=events-service-group
+      - $0booking-confirmed
+      - $0booking-cancelled
+      - Jwt__Secret=${JWT_SECRET_KEY}
+      - Jwt__Issuer=EventMgtApi.UsersService
+      - Jwt__Audience=EventMgtApi
+    depends_on:
+      postgres-events:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - eventapi-network
+
+  bookings-service:
+    build:
+      context: .
+      dockerfile: EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web/Dockerfile
+    container_name: bookings-service
+    restart: unless-stopped
+    ports:
+      - "7003:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=bookings-postgres;Port=5432;Database=bookings_db;Username=postgres;Password=postgres
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__ConsumerGroup=bookings-service-group
+      - $0booking-confirmation-failed
+      - BookingOptions__MaxActiveBookings=10
+      - Jwt__Secret=${JWT_SECRET_KEY}
+      - Jwt__Issuer=EventMgtApi.UsersService
+      - Jwt__Audience=EventMgtApi
+    depends_on:
+      postgres-bookings:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - eventapi-network
+
+  users-service:
+    build:
+      context: .
+      dockerfile: EventMgtApi.UsersService/EventMgtApi.UsersService.Web/Dockerfile
+    container_name: users-service
+    restart: unless-stopped
+    ports:
+      - "7001:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres-users;Port=5432;Database=users_db;Username=postgres;Password=postgres
+      - Jwt__Secret=${JWT_SECRET_KEY}
+      - Jwt__Issuer=EventMgtApi.UsersService
+      - Jwt__Audience=EventMgtApi
+      - SeedOptions__Admins__0__Login=${SEED_ADMIN_LOGIN}
+      - SeedOptions__Admins__0__Password=${SEED_ADMIN_PASSWORD}
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+    networks:
+      - eventapi-network
+
+networks:
+  eventapi-network:
+    driver: bridge
 
 volumes:
-  eventapi_pgdata:
+  users_pgdata:
+  events_pgdata:
+  bookings_pgdata:

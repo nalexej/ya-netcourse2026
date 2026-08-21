@@ -428,4 +428,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-EventMgtApi.Web/appsettings.Development.json
+**/appsettings.Development.json
