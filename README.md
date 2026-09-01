@@ -556,6 +556,9 @@ dotnet run --project EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web
       "booking-cancelled"
     ]
   },
+  "Redis": {
+    "ConnectionString": "localhost:6379"
+  },    
   "Jwt": {
     "Secret": "your-secret-key-here-must-be-at-least-32-chars-long",
     "Issuer": "EventMgtApi.UsersService",
