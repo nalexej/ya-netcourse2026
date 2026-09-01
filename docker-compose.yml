@@ -145,6 +145,8 @@ services:
       - Jwt__Issuer=EventMgtApi.UsersService
       - Jwt__Audience=EventMgtApi
       - Redis__ConnectionString=eventapi-redis:6379
+      - Redis__EventCacheTtlSeconds=300
+      - Redis__TopEventsCacheTtlSeconds=300
     depends_on:
       postgres-events:
         condition: service_healthy

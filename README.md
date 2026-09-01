@@ -557,7 +557,9 @@ dotnet run --project EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web
     ]
   },
   "Redis": {
-    "ConnectionString": "localhost:6379"
+    "ConnectionString": "localhost:6379",
+    "EventCacheTtlSeconds": 300,
+    "TopEventsCacheTtlSeconds": 300	
   },    
   "Jwt": {
     "Secret": "your-secret-key-here-must-be-at-least-32-chars-long",

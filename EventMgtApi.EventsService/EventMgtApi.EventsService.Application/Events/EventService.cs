@@ -1,9 +1,11 @@
 ﻿using EventMgtApi.Application.Abstractions.Services;
 using EventMgtApi.Contracts.Events.DTOs;
+using EventMgtApi.Contracts.Options;
 using EventMgtApi.EventsService.Application.Extensions;
 using EventMgtApi.EventsService.Application.Persistence;
 using EventMgtApi.EventsService.Domain.Entities;
 using EventMgtApi.EventsService.Domain.Exceptions;
+using Microsoft.Extensions.Options;
 
 namespace EventMgtApi.EventsService.Application.Services;
 
@@ -17,17 +19,20 @@ public sealed class EventService : IEventService
     private readonly IEventRepository _repository;
     private readonly ICacheClient _cache;
     private const string CacheKeyPrefix = "event:";
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+    private readonly RedisOptions _redisOptions;
+
 
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="EventService"/>.
     /// </summary>
     /// <param name="repository">Репозиторий для доступа к данным. Не должен быть <see langword="null"/>.</param>
-    /// <param name=")">Редис. Не должен быть <see langword="null"/>.</param>
-    public EventService(IEventRepository repository, ICacheClient cache)
+    /// <param name="cache">Кэш. Не должен быть <see langword="null"/>.</param>
+    /// <param name="redisOptions">Настройки кэша (Редиса) из конфигурации.</param>
+    public EventService(IEventRepository repository, ICacheClient cache, IOptions<RedisOptions> redisOptions)
     {
         _repository = repository;
         _cache = cache;
+        _redisOptions = redisOptions.Value;
     }
 
     /// <inheritdoc />
@@ -74,7 +79,7 @@ public sealed class EventService : IEventService
 
         // 3. Сохраняем в кэш
         var json = System.Text.Json.JsonSerializer.Serialize(dto);
-        await _cache.SetStringAsync(cacheKey, json, CacheTtl, cancellationToken);
+        await _cache.SetStringAsync(cacheKey, json, TimeSpan.FromSeconds(_redisOptions.EventCacheTtlSeconds), cancellationToken);
 
         return dto;
     }
@@ -98,7 +103,7 @@ public sealed class EventService : IEventService
 
         // 3. Сохраняем в кэш
         var json = System.Text.Json.JsonSerializer.Serialize(list);
-        await _cache.SetStringAsync(cacheKey, json, CacheTtl, cancellationToken);
+        await _cache.SetStringAsync(cacheKey, json, TimeSpan.FromSeconds(_redisOptions.TopEventsCacheTtlSeconds), cancellationToken);
 
         return list;
     }
