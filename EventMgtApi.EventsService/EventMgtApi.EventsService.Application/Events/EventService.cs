@@ -80,6 +80,30 @@ public sealed class EventService : IEventService
     }
 
     /// <inheritdoc />
+    public async Task<IEnumerable<TopEventDto>> GetTopEventsAsync(int count = 10, CancellationToken cancellationToken = default)
+    {
+        var cacheKey = "events:top10";
+
+        // 1. Читаем из кэша
+        var cached = await _cache.GetStringAsync(cacheKey, cancellationToken);
+        if (cached != null)
+        {
+            var result = System.Text.Json.JsonSerializer.Deserialize<IEnumerable<TopEventDto>>(cached)!;
+            return result;
+        }
+
+        // 2. Кэш промах — читаем из БД
+        var topEvents = await _repository.GetTopEventsAsync(count, cancellationToken);
+        var list = topEvents.ToList();
+
+        // 3. Сохраняем в кэш
+        var json = System.Text.Json.JsonSerializer.Serialize(list);
+        await _cache.SetStringAsync(cacheKey, json, CacheTtl, cancellationToken);
+
+        return list;
+    }
+
+    /// <inheritdoc />
     public async Task<EventDtoResponse> AddEventAsync(EventDto evtDto, CancellationToken cancellationToken = default)
     {
         // Дополнительная защита: на случай, если метод вызван без валидации модели
