@@ -36,6 +36,7 @@ public static class InfrastructureServiceCollectionExtensions
         configuration.GetSection(RedisOptions.SectionName).Bind(redisOptions);
         services.AddSingleton<IConnectionMultiplexer>(_ =>
             ConnectionMultiplexer.Connect(redisOptions.ConnectionString));
+        services.AddSingleton<ICacheClient, RedisCacheClient>();
 
         return services;
     }
