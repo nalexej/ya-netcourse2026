@@ -1,5 +1,5 @@
+using EventMgtApi.Contracts.Caching;
 using EventMgtApi.Contracts.Options;
-using EventMgtApi.EventsService.Application.Persistence;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;

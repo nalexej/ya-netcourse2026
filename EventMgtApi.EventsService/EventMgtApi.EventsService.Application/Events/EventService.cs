@@ -1,6 +1,8 @@
 ﻿using EventMgtApi.Application.Abstractions.Services;
+using EventMgtApi.Contracts.Caching;
 using EventMgtApi.Contracts.Events.DTOs;
 using EventMgtApi.Contracts.Options;
+using EventMgtApi.EventsService.Application.Caching;
 using EventMgtApi.EventsService.Application.Extensions;
 using EventMgtApi.EventsService.Application.Persistence;
 using EventMgtApi.EventsService.Domain.Entities;
@@ -18,8 +20,7 @@ public sealed class EventService : IEventService
 {
     private readonly IEventRepository _repository;
     private readonly ICacheClient _cache;
-    private const string CacheKeyPrefix = "event:";
-    private readonly RedisOptions _redisOptions;
+    private readonly EventCacheOptions _eventCacheOptions;
 
 
     /// <summary>
@@ -27,12 +28,12 @@ public sealed class EventService : IEventService
     /// </summary>
     /// <param name="repository">Репозиторий для доступа к данным. Не должен быть <see langword="null"/>.</param>
     /// <param name="cache">Кэш. Не должен быть <see langword="null"/>.</param>
-    /// <param name="redisOptions">Настройки кэша (Редиса) из конфигурации.</param>
-    public EventService(IEventRepository repository, ICacheClient cache, IOptions<RedisOptions> redisOptions)
+    /// <param name="eventCacheOptions">Настройки кэша событий из конфигурации.</param>
+    public EventService(IEventRepository repository, ICacheClient cache, IOptions<EventCacheOptions> eventCacheOptions)
     {
         _repository = repository;
         _cache = cache;
-        _redisOptions = redisOptions.Value;
+        _eventCacheOptions = eventCacheOptions.Value;
     }
 
     /// <inheritdoc />
@@ -62,7 +63,7 @@ public sealed class EventService : IEventService
     /// <inheritdoc />
     public async Task<EventDtoResponse> GetEventAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"{CacheKeyPrefix}{id}";
+        var cacheKey = EventCacheKeys.ForEvent(id);
 
         // 1. Попытка прочитать из кэша
         var cached = await _cache.GetStringAsync(cacheKey, cancellationToken);
@@ -79,7 +80,7 @@ public sealed class EventService : IEventService
 
         // 3. Сохраняем в кэш
         var json = System.Text.Json.JsonSerializer.Serialize(dto);
-        await _cache.SetStringAsync(cacheKey, json, TimeSpan.FromSeconds(_redisOptions.EventCacheTtlSeconds), cancellationToken);
+        await _cache.SetStringAsync(EventCacheKeys.ForEvent(id), json, TimeSpan.FromSeconds(_eventCacheOptions.EventTtlSeconds), cancellationToken);
 
         return dto;
     }
@@ -87,7 +88,7 @@ public sealed class EventService : IEventService
     /// <inheritdoc />
     public async Task<IEnumerable<TopEventDto>> GetTopEventsAsync(int count = 10, CancellationToken cancellationToken = default)
     {
-        var cacheKey = "events:top10";
+        var cacheKey = EventCacheKeys.TopEvents;
 
         // 1. Читаем из кэша
         var cached = await _cache.GetStringAsync(cacheKey, cancellationToken);
@@ -103,7 +104,7 @@ public sealed class EventService : IEventService
 
         // 3. Сохраняем в кэш
         var json = System.Text.Json.JsonSerializer.Serialize(list);
-        await _cache.SetStringAsync(cacheKey, json, TimeSpan.FromSeconds(_redisOptions.TopEventsCacheTtlSeconds), cancellationToken);
+        await _cache.SetStringAsync(cacheKey, json, TimeSpan.FromSeconds(_eventCacheOptions.TopEventsTtlSeconds), cancellationToken);
 
         return list;
     }
@@ -141,7 +142,7 @@ public sealed class EventService : IEventService
         eventEntity.Update(evtDto.Title, evtDto.StartAt, evtDto.EndAt, evtDto.Description);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        await _cache.RemoveAsync($"{CacheKeyPrefix}{id}", cancellationToken);
+        await _cache.RemoveAsync(EventCacheKeys.ForEvent(id), cancellationToken);
         return eventEntity.ToDtoResponse();
     }
 
@@ -154,7 +155,7 @@ public sealed class EventService : IEventService
         await _repository.DeleteAsync(eventEntity, cancellationToken);
         await _repository.SaveChangesAsync(cancellationToken);
 
-        await _cache.RemoveAsync($"{CacheKeyPrefix}{eventEntity.Id}", cancellationToken);
+        await _cache.RemoveAsync(EventCacheKeys.ForEvent(eventEntity.Id), cancellationToken);
         return true;
     }
 }

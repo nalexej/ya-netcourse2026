@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using EventMgtApi.Contracts.Caching;
 using EventMgtApi.Contracts.Events;
 using EventMgtApi.Contracts.Options;
 using EventMgtApi.Contracts.ServiceInteraction;
