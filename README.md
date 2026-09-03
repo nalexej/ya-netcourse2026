@@ -178,7 +178,7 @@ API предоставляет полный цикл **CRUD**:
 
 ```
 HomeWork/
-├── EventMgtService.sln                    # Решение (3 сервиса + Contracts)
+├── EventMgtService.sln                    # Корневое решение (все сервисы + Contracts)
 ├── docker-compose.yml                     # PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
 │
 ├── EventMgtApi.Contracts/                 # 📦 Разделяемый проект контрактов
@@ -189,6 +189,7 @@ HomeWork/
 │   ├── Events/DTOs/
 │   │   ├── EventDto.cs                    # DTO для создания/обновления события
 │   │   ├── EventDtoResponse.cs            # DTO ответа события
+│   │   ├── TopEventDto.cs                 # DTO для топ-N событий
 │   │   └── PaginatedResult.cs             # Результат пагинации
 │   ├── Bookings/DTOs/
 │   │   ├── BookingResponseDto.cs          # DTO ответа бронирования
@@ -264,6 +265,7 @@ HomeWork/
 │       │   └── ApplicationBuilderExtensions.cs
 │       ├── Program.cs
 │       ├── appsettings.json
+│       ├── Dockerfile
 │       └── EventMgtApi.UsersService.Web.csproj
 │
 ├── EventMgtApi.EventsService/             # 📅 Сервис событий (CRUD)
@@ -312,6 +314,7 @@ HomeWork/
 │       │   └── ApplicationBuilderExtensions.cs
 │       ├── Program.cs
 │       ├── appsettings.json
+│       ├── Dockerfile
 │       └── EventMgtApi.EventsService.Web.csproj
 │
 ├── EventMgtApi.BookingsService/           # 🎫 Сервис бронирований
@@ -347,7 +350,7 @@ HomeWork/
 │   │   │   │   └── BookingConfiguration.cs # Конфигурация Fluent API
 │   │   │   └── Repositories/
 │   │   │       └── BookingRepository.cs   # Реализация IBookingRepository
-│   │   ├── Persistence/Services/
+│   │   ├── Services/
 │   │   │   └── BookingProcessingBackgroundService.cs  # Фоновая обработка Pending
 │   │   ├── ServiceInteraction/
 │   │   │   ├── BookingServiceMessagingPublisher.cs    # Издатель Kafka
@@ -369,7 +372,12 @@ HomeWork/
 │       │   └── ApplicationBuilderExtensions.cs
 │       ├── Program.cs
 │       ├── appsettings.json
+│       ├── Dockerfile
 │       └── EventMgtApi.BookingsService.Web.csproj
+│
+├── EventMgtApi.EventsService/EventMgtApi.EventsService.Tests/  # 🧪 Unit-тесты EventsService
+│   ├── EventMgtApi.EventsService.Tests.csproj
+│   └── EventServiceTests.cs                                           # Тесты
 │
 └── docker-compose.yml                     # 🐳 PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
 └── .env.example                     # пример задания переменных окружения (seed-администратор и др)
@@ -934,8 +942,35 @@ API возвращает ошибки в стандартизированном 
 |---------|-------------------|
 | `PUT /events/{id}` | `event:{id}` |
 | `DELETE /events/{id}` | `event:{id}` |
-| Kafka: `BookingConfirmed` | `event:{eventId}`, `events:top10` |
-| Kafka: `BookingCancelled` | `event:{eventId}`, `events:top10` |
+| Kafka: `BookingConfirmed` | `event:{eventId}` |
+| Kafka: `BookingCancelled` | `event:{eventId}` |
+
+> ⚠️ `events:top10` инвалидируется только по TTL (5 мин). Явная инвалидация отсутствует — устаревание рейтинга некритично.
+
+---
+
+## 🧪 Unit-тесты
+
+Модульные тесты для `EventService` находятся в проекте `EventMgtApi.EventsService.Tests`.
+
+### Что тестируется
+
+| Сценарий | Тесты |
+|----------|-------|
+| **Cache hit** — данные из кеша, репозиторий не вызывается | `GetEventAsync_CacheHit_…`, `GetTopEventsAsync_CacheHit_…` |
+| **Cache miss** — данные из репозитория, запись в кеш | `GetEventAsync_CacheMiss_…`, `GetTopEventsAsync_CacheMiss_…` |
+| **Инвалидация кэша** при мутациях | `UpdateEventAsync_CacheInvalidated`, `RemoveEventAsync_CacheInvalidated` |
+| **AddEventAsync** — кэш не инвалидируется (текущее поведение) | `AddEventAsync_CacheNotInvalidated_…` |
+| **GetEventsAsync** — пагинация без кэша | `GetEventsAsync_RepositoryCalled_CacheNotUsed`|
+| **Обработка ошибок** — NotFoundException, ValidationException, ArgumentNullException | `*_EntityNotFound_ThrowsNotFoundException`, `AddEventAsync_NullStartAt_ThrowsValidationException`, `AddEventAsync_NullDto_ThrowsArgumentNullException` |
+
+### Запуск
+
+```bash
+dotnet test EventMgtApi.EventsService/EventMgtApi.EventsService.Tests/
+```
+
+Все тесты используют **Moq** для подмены `IEventRepository` и `ICacheClient`.
 
 ---
 
