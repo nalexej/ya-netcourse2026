@@ -203,7 +203,7 @@ public class EventServiceMessagingConsumer : BackgroundService
         }
 
         // Проверка: дата начала события в прошлом
-        if (@event.StartAt <= DateTime.UtcNow) 
+        if (@event.StartAt <= DateTime.UtcNow)
         {
             _logger.LogWarning(
                 "Нельзя забронировать событие {EventId}, дата начала которого в прошлом. Бронь {BookingId}. ",
@@ -288,7 +288,7 @@ public class EventServiceMessagingConsumer : BackgroundService
         @event.ReleaseSeats(cancelled.SeatsCount);
         await processedBookingRepository.AddAsync(cancelled.EventId, cancelled.BookingId, "Cancelled", ct);
         await eventRepository.SaveChangesAsync(ct);
-        
+
         await _cache.RemoveAsync($"event:{cancelled.EventId}", ct);
 
         _logger.LogInformation(
