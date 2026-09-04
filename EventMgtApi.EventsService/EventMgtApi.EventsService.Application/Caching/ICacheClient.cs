@@ -1,4 +1,4 @@
-namespace EventMgtApi.Contracts.Caching;
+namespace EventMgtApi.EventsService.Application.Caching;
 
 /// <summary>
 /// Интерфейс кэша — изолирует Application-слой от конкретной реализации (Redis и т.д.).

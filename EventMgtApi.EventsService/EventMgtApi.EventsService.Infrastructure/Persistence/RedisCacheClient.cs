@@ -1,4 +1,4 @@
-using EventMgtApi.Contracts.Caching;
+using EventMgtApi.EventsService.Application.Caching;
 using EventMgtApi.Contracts.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

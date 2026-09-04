@@ -1,7 +1,6 @@
-using EventMgtApi.Contracts.Caching;
+using EventMgtApi.EventsService.Application.Caching;
 using EventMgtApi.Contracts.Options;
 using EventMgtApi.Contracts.ServiceInteraction;
-using EventMgtApi.EventsService.Application.Caching;
 using EventMgtApi.EventsService.Application.Persistence;
 using EventMgtApi.EventsService.Infrastructure.Persistence;
 using EventMgtApi.EventsService.Infrastructure.Persistence.Repositories;
