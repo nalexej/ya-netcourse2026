@@ -45,6 +45,12 @@ public interface IEventRepository
     Task<Event?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
     /// <summary>
+    /// Возвращает N событий с наибольшим процентом продаж, отсортированных по убыванию.
+    /// Процент = (total_seats - available_seats) / total_seats.
+    /// </summary>
+    Task<IEnumerable<TopEventDto>> GetTopEventsAsync(int count = 10, CancellationToken ct = default);
+
+    /// <summary>
     /// Асинхронно добавляет новое событие.
     /// </summary>
     /// <param name="event">Событие для добавления. Не должно быть null.</param>

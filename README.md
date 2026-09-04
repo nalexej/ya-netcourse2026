@@ -178,7 +178,7 @@ API предоставляет полный цикл **CRUD**:
 
 ```
 HomeWork/
-├── EventMgtService.sln                    # Решение (3 сервиса + Contracts)
+├── EventMgtService.sln                    # Корневое решение (все сервисы + Contracts)
 ├── docker-compose.yml                     # PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
 │
 ├── EventMgtApi.Contracts/                 # 📦 Разделяемый проект контрактов
@@ -189,6 +189,7 @@ HomeWork/
 │   ├── Events/DTOs/
 │   │   ├── EventDto.cs                    # DTO для создания/обновления события
 │   │   ├── EventDtoResponse.cs            # DTO ответа события
+│   │   ├── TopEventDto.cs                 # DTO для топ-N событий
 │   │   └── PaginatedResult.cs             # Результат пагинации
 │   ├── Bookings/DTOs/
 │   │   ├── BookingResponseDto.cs          # DTO ответа бронирования
@@ -264,6 +265,7 @@ HomeWork/
 │       │   └── ApplicationBuilderExtensions.cs
 │       ├── Program.cs
 │       ├── appsettings.json
+│       ├── Dockerfile
 │       └── EventMgtApi.UsersService.Web.csproj
 │
 ├── EventMgtApi.EventsService/             # 📅 Сервис событий (CRUD)
@@ -277,22 +279,27 @@ HomeWork/
 │   │   └── EventMgtApi.EventsService.Domain.csproj
 │   ├── EventMgtApi.EventsService.Application/
 │   │   ├── Events/
-│   │   │   ├── EventService.cs            # Логика CRUD
-│   │   │   └── Extensions/
-│   │   │       └── EventMappingExtensions.cs
-│   │   ├── Persistence/
+    │   │   │   ├── EventService.cs            # Логика CRUD
+    │   │   │   └── Extensions/
+    │   │   │       └── EventMappingExtensions.cs
+    │   │   ├── Caching/
+    │   │   │   ├── ICacheClient.cs            # Интерфейс кэша
+    │   │   │   ├── EventCacheKeys.cs          # Константы ключей кэша
+    │   │   │   └── EventCacheOptions.cs       # Опции TTL кэша
+    │   │   ├── Persistence/
 │   │   │   └── IEventRepository.cs        # Интерфейс репозитория
 │   │   ├── DependencyInjection/
 │   │   │   └── ApplicationServiceCollectionExtensions.cs
 │   │   └── EventMgtApi.EventsService.Application.csproj
 │   ├── EventMgtApi.EventsService.Infrastructure/
 │   │   ├── Persistence/
-│   │   │   ├── EventDbContext.cs          # DbContext для событий
-│   │   │   ├── Configurations/
-│   │   │   │   └── EventConfiguration.cs  # Конфигурация Fluent API
-│   │   │   └── Repositories/
-│   │   │       └── EventRepository.cs     # Реализация IEventRepository
-│   │   ├── ServiceInteractions/
+    │   │   │   ├── EventDbContext.cs          # DbContext для событий
+    │   │   │   ├── Configurations/
+    │   │   │   │   └── EventConfiguration.cs  # Конфигурация Fluent API
+    │   │   │   ├── Repositories/
+    │   │   │   │   └── EventRepository.cs     # Реализация IEventRepository
+    │   │   │   └── RedisCacheClient.cs        # Redis-реализация кэша (Cache-Aside)
+    │   │   ├── ServiceInteractions/
 │   │   │   ├── EventServiceMessagingConsumer.cs  # Потребитель Kafka
 │   │   │   └── KafkaTopicInitializer.cs         # Инициализация топиков Kafka
 │   │   ├── DependencyInjection/
@@ -312,6 +319,7 @@ HomeWork/
 │       │   └── ApplicationBuilderExtensions.cs
 │       ├── Program.cs
 │       ├── appsettings.json
+│       ├── Dockerfile
 │       └── EventMgtApi.EventsService.Web.csproj
 │
 ├── EventMgtApi.BookingsService/           # 🎫 Сервис бронирований
@@ -347,7 +355,7 @@ HomeWork/
 │   │   │   │   └── BookingConfiguration.cs # Конфигурация Fluent API
 │   │   │   └── Repositories/
 │   │   │       └── BookingRepository.cs   # Реализация IBookingRepository
-│   │   ├── Persistence/Services/
+│   │   ├── Services/
 │   │   │   └── BookingProcessingBackgroundService.cs  # Фоновая обработка Pending
 │   │   ├── ServiceInteraction/
 │   │   │   ├── BookingServiceMessagingPublisher.cs    # Издатель Kafka
@@ -369,7 +377,12 @@ HomeWork/
 │       │   └── ApplicationBuilderExtensions.cs
 │       ├── Program.cs
 │       ├── appsettings.json
+│       ├── Dockerfile
 │       └── EventMgtApi.BookingsService.Web.csproj
+│
+├── EventMgtApi.EventsService/EventMgtApi.EventsService.Tests/  # 🧪 Unit-тесты EventsService
+│   ├── EventMgtApi.EventsService.Tests.csproj
+│   └── EventServiceTests.cs                                           # Тесты
 │
 └── docker-compose.yml                     # 🐳 PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
 └── .env.example                     # пример задания переменных окружения (seed-администратор и др)
@@ -556,6 +569,16 @@ dotnet run --project EventMgtApi.BookingsService/EventMgtApi.BookingsService.Web
       "booking-cancelled"
     ]
   },
+  "Redis": {
+    "ConnectionString": "eventapi-redis:6379",
+    "ConnectTimeout": 5000,
+    "AbortOnConnectFail": false,
+    "ConnectRetry": 1
+  },  
+  "EventCache": {
+    "EventTtlSeconds": 300,
+    "TopEventsTtlSeconds": 300
+  },   
   "Jwt": {
     "Secret": "your-secret-key-here-must-be-at-least-32-chars-long",
     "Issuer": "EventMgtApi.UsersService",
@@ -888,6 +911,79 @@ API возвращает ошибки в стандартизированном 
 
 ---
 
+## ⚡ Кеширование (Redis Cache-Aside)
+
+### Что кешируется
+
+| Ключ | Значение | TTL | Стратегия инвалидации |
+|------|----------|-----|----------------------|
+| `event:{id}` | JSON-представление `EventDtoResponse` одного события | 5 минут | Явная инвалидация при `UPDATE`/`DELETE` события и при изменении `AvailableSeats` через Kafka |
+| `events:top10` | JSON-список топ-10 событий по проценту продаж | 5 минут | Только по TTL — рейтинговый агрегат, небольшое устаревание некритично |
+
+### Почему так
+
+- **Отдельное событие (`event:{id}`)** — данные меняются часто (бронирования), устаревание заметно пользователю → **инвалидация при записи**.
+- **Топ-10 (`events:top10`)** — рейтинговый агрегат, меняется редко → **только TTL**, явная инвалидация избыточна.
+
+### Устойчивость к отказам
+
+Если Redis недоступен:
+- Состояние соединения проверяется при каждом вызове (`_redis.IsConnected`)
+- Ошибка логируется на уровне `RedisCacheClient`
+- Возвращается `null` / операция пропускается
+- Запрос идёт напрямую в базу данных
+- Клиент **не получает ошибок** — кеш просто деградирует
+
+### Порядок операций (безопасность)
+
+При изменении данных:
+1. Сначала `SaveChangesAsync()` в базу
+2. Затем `RemoveAsync()` в кэш
+
+Если операция прервётся между шагами — база останется актуальной, кеш обновится при следующем чтении.
+
+### Где инвалидируется кэш
+
+| Событие | Ключи инвалидации |
+|---------|-------------------|
+| `PUT /events/{id}` | `event:{id}` |
+| `DELETE /events/{id}` | `event:{id}` |
+| Kafka: `BookingConfirmed` | `event:{eventId}` |
+| Kafka: `BookingCancelled` | `event:{eventId}` |
+
+> ⚠️ `events:top10` инвалидируется только по TTL (5 мин). Явная инвалидация отсутствует — устаревание рейтинга некритично.
+
+### Согласованность ключей
+
+Все ключи кэша определяются через `EventCacheKeys` (Application-слой) — как в контроллерах, так и в Kafka-потребителе. Это исключает рассинхронизацию форматов ключей.
+
+---
+
+## 🧪 Unit-тесты
+
+Модульные тесты для `EventService` находятся в проекте `EventMgtApi.EventsService.Tests`.
+
+### Что тестируется
+
+| Сценарий | Тесты |
+|----------|-------|
+| **Cache hit** — данные из кеша, репозиторий не вызывается | `GetEventAsync_CacheHit_…`, `GetTopEventsAsync_CacheHit_…` |
+| **Cache miss** — данные из репозитория, запись в кеш | `GetEventAsync_CacheMiss_…`, `GetTopEventsAsync_CacheMiss_…` |
+| **Инвалидация кэша** при мутациях | `UpdateEventAsync_CacheInvalidated`, `RemoveEventAsync_CacheInvalidated` |
+| **AddEventAsync** — кэш не инвалидируется (текущее поведение) | `AddEventAsync_CacheNotInvalidated_…` |
+| **GetEventsAsync** — пагинация без кэша | `GetEventsAsync_RepositoryCalled_CacheNotUsed`|
+| **Обработка ошибок** — NotFoundException, ValidationException, ArgumentNullException | `*_EntityNotFound_ThrowsNotFoundException`, `AddEventAsync_NullStartAt_ThrowsValidationException`, `AddEventAsync_NullDto_ThrowsArgumentNullException` |
+
+### Запуск
+
+```bash
+dotnet test EventMgtApi.EventsService/EventMgtApi.EventsService.Tests/
+```
+
+Все тесты используют **Moq** для подмены `IEventRepository` и `ICacheClient`.
+
+---
+
 ## ⚠️ Ограничения
 
 - Часовые пояса не обрабатываются (все даты в UTC)
@@ -900,8 +996,6 @@ API возвращает ошибки в стандартизированном 
 - Интеграция с email и платежами
 - Распределённое трассирование (OpenTelemetry)
 - API Gateway (Ocelot / YARP)
-- Интеграционные тесты с Testcontainers
-
 ---
 
 > 🙌 Спасибо за использование!
