@@ -10,7 +10,7 @@ namespace EventMgtApi.EventsService.Infrastructure.Persistence;
 /// Redis-реализация кэша. При недоступности Redis логировать ошибку и
 /// возвращать null / молча игнорировать — кеш деградирует, клиент идёт в БД.
 /// </summary>
-public sealed class RedisCacheClient : ICacheClient, IDisposable
+public sealed class RedisCacheClient : ICacheClient
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<RedisCacheClient> _logger;
@@ -86,10 +86,5 @@ public sealed class RedisCacheClient : ICacheClient, IDisposable
         {
             _logger.LogWarning(ex, "Redis RemoveAsync failed for key '{Key}'.", key);
         }
-    }
-
-    public void Dispose()
-    {
-        _redis?.Dispose();
     }
 }
