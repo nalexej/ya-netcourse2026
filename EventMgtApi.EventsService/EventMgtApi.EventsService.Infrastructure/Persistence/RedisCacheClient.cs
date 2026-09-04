@@ -43,7 +43,7 @@ public sealed class RedisCacheClient : ICacheClient, IDisposable
         try
         {
             var db = _redis.GetDatabase();
-            var value = await db.StringGetAsync(key, CommandFlags.FireAndForget);
+            var value = await db.StringGetAsync(key);
             return value.HasValue ? value.ToString() : null;
         }
         catch (Exception ex)
