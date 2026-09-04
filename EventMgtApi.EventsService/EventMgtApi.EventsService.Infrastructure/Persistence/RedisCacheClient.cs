@@ -14,7 +14,6 @@ public sealed class RedisCacheClient : ICacheClient, IDisposable
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<RedisCacheClient> _logger;
-    private readonly bool _isConnected;
 
     public RedisCacheClient(
         IConnectionMultiplexer redis,
@@ -22,19 +21,11 @@ public sealed class RedisCacheClient : ICacheClient, IDisposable
     {
         _redis = redis;
         _logger = logger;
-        _isConnected = redis.IsConnected;
-
-        // Подписываемся на событие потери соединения
-        redis.ConnectionRestored += (_, _) =>
-            _logger.LogInformation("Redis connection restored.");
-
-        redis.ConnectionFailed += (_, _) =>
-            _logger.LogWarning("Redis connection lost.");
     }
 
     public async Task<string?> GetStringAsync(string key, CancellationToken ct = default)
     {
-        if (!_isConnected)
+        if (!_redis.IsConnected)
         {
             _logger.LogWarning("Redis is not connected. Cache miss for key '{Key}'.", key);
             return null;
@@ -59,7 +50,7 @@ public sealed class RedisCacheClient : ICacheClient, IDisposable
         TimeSpan? expiresIn = null,
         CancellationToken ct = default)
     {
-        if (!_isConnected)
+        if (!_redis.IsConnected)
         {
             _logger.LogWarning("Redis is not connected. Skipping cache set for key '{Key}'.", key);
             return;
@@ -80,7 +71,7 @@ public sealed class RedisCacheClient : ICacheClient, IDisposable
 
     public async Task RemoveAsync(string key, CancellationToken ct = default)
     {
-        if (!_isConnected)
+        if (!_redis.IsConnected)
         {
             _logger.LogWarning("Redis is not connected. Skipping cache remove for key '{Key}'.", key);
             return;
