@@ -254,7 +254,7 @@ public class EventServiceMessagingConsumer : BackgroundService
         await processedBookingRepository.AddAsync(confirmed.EventId, confirmed.BookingId, "Confirmed", ct);
         await eventRepository.SaveChangesAsync(ct);
 
-        await _cache.RemoveAsync($"event:{confirmed.EventId}", ct);
+        await _cache.RemoveAsync(EventCacheKeys.ForEvent(confirmed.EventId), ct);
 
         _logger.LogInformation(
             "Зарезервировано {Seats} мест для события {EventId} по брони {BookingId}",
@@ -289,7 +289,7 @@ public class EventServiceMessagingConsumer : BackgroundService
         await processedBookingRepository.AddAsync(cancelled.EventId, cancelled.BookingId, "Cancelled", ct);
         await eventRepository.SaveChangesAsync(ct);
 
-        await _cache.RemoveAsync($"event:{cancelled.EventId}", ct);
+        await _cache.RemoveAsync(EventCacheKeys.ForEvent(cancelled.EventId), ct);
 
         _logger.LogInformation(
             "Освобождено {Seats} мест для события {EventId} по отмене брони {BookingId}",
