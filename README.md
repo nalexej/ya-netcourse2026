@@ -279,22 +279,27 @@ HomeWork/
 │   │   └── EventMgtApi.EventsService.Domain.csproj
 │   ├── EventMgtApi.EventsService.Application/
 │   │   ├── Events/
-│   │   │   ├── EventService.cs            # Логика CRUD
-│   │   │   └── Extensions/
-│   │   │       └── EventMappingExtensions.cs
-│   │   ├── Persistence/
+    │   │   │   ├── EventService.cs            # Логика CRUD
+    │   │   │   └── Extensions/
+    │   │   │       └── EventMappingExtensions.cs
+    │   │   ├── Caching/
+    │   │   │   ├── ICacheClient.cs            # Интерфейс кэша
+    │   │   │   ├── EventCacheKeys.cs          # Константы ключей кэша
+    │   │   │   └── EventCacheOptions.cs       # Опции TTL кэша
+    │   │   ├── Persistence/
 │   │   │   └── IEventRepository.cs        # Интерфейс репозитория
 │   │   ├── DependencyInjection/
 │   │   │   └── ApplicationServiceCollectionExtensions.cs
 │   │   └── EventMgtApi.EventsService.Application.csproj
 │   ├── EventMgtApi.EventsService.Infrastructure/
 │   │   ├── Persistence/
-│   │   │   ├── EventDbContext.cs          # DbContext для событий
-│   │   │   ├── Configurations/
-│   │   │   │   └── EventConfiguration.cs  # Конфигурация Fluent API
-│   │   │   └── Repositories/
-│   │   │       └── EventRepository.cs     # Реализация IEventRepository
-│   │   ├── ServiceInteractions/
+    │   │   │   ├── EventDbContext.cs          # DbContext для событий
+    │   │   │   ├── Configurations/
+    │   │   │   │   └── EventConfiguration.cs  # Конфигурация Fluent API
+    │   │   │   ├── Repositories/
+    │   │   │   │   └── EventRepository.cs     # Реализация IEventRepository
+    │   │   │   └── RedisCacheClient.cs        # Redis-реализация кэша (Cache-Aside)
+    │   │   ├── ServiceInteractions/
 │   │   │   ├── EventServiceMessagingConsumer.cs  # Потребитель Kafka
 │   │   │   └── KafkaTopicInitializer.cs         # Инициализация топиков Kafka
 │   │   ├── DependencyInjection/
@@ -923,6 +928,7 @@ API возвращает ошибки в стандартизированном 
 ### Устойчивость к отказам
 
 Если Redis недоступен:
+- Состояние соединения проверяется при каждом вызове (`_redis.IsConnected`)
 - Ошибка логируется на уровне `RedisCacheClient`
 - Возвращается `null` / операция пропускается
 - Запрос идёт напрямую в базу данных
@@ -946,6 +952,10 @@ API возвращает ошибки в стандартизированном 
 | Kafka: `BookingCancelled` | `event:{eventId}` |
 
 > ⚠️ `events:top10` инвалидируется только по TTL (5 мин). Явная инвалидация отсутствует — устаревание рейтинга некритично.
+
+### Согласованность ключей
+
+Все ключи кэша определяются через `EventCacheKeys` (Application-слой) — как в контроллерах, так и в Kafka-потребителе. Это исключает рассинхронизацию форматов ключей.
 
 ---
 
