@@ -1,7 +1,6 @@
 using EventMgtApi.Application.Abstractions.Services;
 using EventMgtApi.EventsService.Application.Caching;
 using EventMgtApi.Contracts.Events.DTOs;
-using EventMgtApi.EventsService.Application.Caching;
 using EventMgtApi.EventsService.Application.Persistence;
 using EventMgtApi.EventsService.Application.Services;
 using EventMgtApi.EventsService.Domain.Entities;
