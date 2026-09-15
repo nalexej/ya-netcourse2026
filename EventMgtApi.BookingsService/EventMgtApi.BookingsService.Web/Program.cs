@@ -12,9 +12,14 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using System.Reflection;
 using System.Text;
-
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+       .WriteTo.Console(new CompactJsonFormatter()));
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
