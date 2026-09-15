@@ -130,6 +130,25 @@ namespace EventMgtApi.EventsService.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
+        public async Task<IEnumerable<TopEventDto>> GetTopEventsAsync(int count = 10, CancellationToken ct = default)
+        {
+            var items = await _context.Events
+                .OrderByDescending(e => (e.TotalSeats - e.AvailableSeats) / (decimal)e.TotalSeats)
+                .Take(count)
+                .Select(e => new TopEventDto
+                {
+                    Id = e.Id,
+                    Title = e.Title,
+                    TotalSeats = e.TotalSeats,
+                    AvailableSeats = e.AvailableSeats,
+                    SoldPercent = (e.TotalSeats - e.AvailableSeats) / (decimal)e.TotalSeats
+                })
+                .ToListAsync(ct);
+
+            return items;
+        }
+
+        /// <inheritdoc />
         public async Task<Event?> GetWithLockAsync(Guid id, CancellationToken ct = default)
         {
             var sql = @"SELECT ""id"", ""title"", ""description"", ""start_at"", ""end_at"", ""total_seats"", ""available_seats""

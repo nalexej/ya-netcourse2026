@@ -72,6 +72,18 @@ public class EventsController : ControllerBase
     }
 
     /// <summary>
+    /// Возвращает топ-10 самых популярных событий по проценту продаж.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("top")]
+    [ProducesResponseType(typeof(IEnumerable<TopEventDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<TopEventDto>>> GetTopEvents()
+    {
+        var topEvents = await _eventService.GetTopEventsAsync(10);
+        return Ok(topEvents);
+    }
+
+    /// <summary>
     /// Добавляет новое событие.
     /// </summary>
     /// <param name="evtDto">Модель события, переданная в теле запроса. Не должна быть null.</param>

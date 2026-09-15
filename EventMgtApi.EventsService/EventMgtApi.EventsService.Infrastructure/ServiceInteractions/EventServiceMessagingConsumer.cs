@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using EventMgtApi.EventsService.Application.Caching;
 using EventMgtApi.Contracts.Events;
 using EventMgtApi.Contracts.Options;
 using EventMgtApi.Contracts.ServiceInteraction;
@@ -16,15 +17,18 @@ public class EventServiceMessagingConsumer : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<EventServiceMessagingConsumer> _logger;
     private readonly KafkaOptions _options;
+    private readonly ICacheClient _cache;
 
     public EventServiceMessagingConsumer(
         IServiceProvider serviceProvider,
         ILogger<EventServiceMessagingConsumer> logger,
-        IOptions<KafkaOptions> options)
+        IOptions<KafkaOptions> options,
+        ICacheClient cache)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
         _options = options.Value;
+        _cache = cache;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -199,7 +203,7 @@ public class EventServiceMessagingConsumer : BackgroundService
         }
 
         // Проверка: дата начала события в прошлом
-        if (@event.StartAt <= DateTime.UtcNow) 
+        if (@event.StartAt <= DateTime.UtcNow)
         {
             _logger.LogWarning(
                 "Нельзя забронировать событие {EventId}, дата начала которого в прошлом. Бронь {BookingId}. ",
@@ -250,6 +254,8 @@ public class EventServiceMessagingConsumer : BackgroundService
         await processedBookingRepository.AddAsync(confirmed.EventId, confirmed.BookingId, "Confirmed", ct);
         await eventRepository.SaveChangesAsync(ct);
 
+        await _cache.RemoveAsync(EventCacheKeys.ForEvent(confirmed.EventId), ct);
+
         _logger.LogInformation(
             "Зарезервировано {Seats} мест для события {EventId} по брони {BookingId}",
             confirmed.SeatsCount, confirmed.EventId, confirmed.BookingId);
@@ -282,6 +288,8 @@ public class EventServiceMessagingConsumer : BackgroundService
         @event.ReleaseSeats(cancelled.SeatsCount);
         await processedBookingRepository.AddAsync(cancelled.EventId, cancelled.BookingId, "Cancelled", ct);
         await eventRepository.SaveChangesAsync(ct);
+
+        await _cache.RemoveAsync(EventCacheKeys.ForEvent(cancelled.EventId), ct);
 
         _logger.LogInformation(
             "Освобождено {Seats} мест для события {EventId} по отмене брони {BookingId}",

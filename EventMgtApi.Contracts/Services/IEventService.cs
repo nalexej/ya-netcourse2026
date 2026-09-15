@@ -42,6 +42,13 @@ public interface IEventService
     Task<EventDtoResponse> GetEventAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// <param name="count">Количество топ-событий, которые необходимо вернуть.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// Возвращает топ-N самых популярных событий по проценту продаж.
+    /// </summary>
+    Task<IEnumerable<TopEventDto>> GetTopEventsAsync(int count = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Асинхронно добавляет новое событие.
     /// </summary>
     /// <param name="evtDto">Данные события, которое необходимо добавить. Не должно быть null.</param>

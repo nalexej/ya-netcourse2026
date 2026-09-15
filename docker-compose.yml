@@ -115,6 +115,17 @@ services:
       retries: 5
     networks:
       - eventapi-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: eventapi-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eventapi-network
       
   events-service:
     build:
@@ -128,15 +139,23 @@ services:
       - ConnectionStrings__DefaultConnection=Host=events-postgres;Port=5432;Database=events_db;Username=postgres;Password=postgres
       - Kafka__BootstrapServers=kafka:29092
       - Kafka__ConsumerGroup=events-service-group
-      - $0booking-confirmed
-      - $0booking-cancelled
+      - Kafka__Topics__0=booking-confirmed
+      - Kafka__Topics__1=booking-cancelled
       - Jwt__Secret=${JWT_SECRET_KEY}
       - Jwt__Issuer=EventMgtApi.UsersService
       - Jwt__Audience=EventMgtApi
+      - Redis__ConnectionString=eventapi-redis:6379
+      - Redis__ConnectTimeout=5000
+      - Redis__AbortOnConnectFail=false
+      - Redis__ConnectRetry=1
+      - EventCache__EventTtlSeconds=300
+      - EventCache__TopEventsTtlSeconds=300
     depends_on:
       postgres-events:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - eventapi-network
@@ -153,7 +172,7 @@ services:
       - ConnectionStrings__DefaultConnection=Host=bookings-postgres;Port=5432;Database=bookings_db;Username=postgres;Password=postgres
       - Kafka__BootstrapServers=kafka:29092
       - Kafka__ConsumerGroup=bookings-service-group
-      - $0booking-confirmation-failed
+      - Kafka__Topics__0=booking-confirmation-failed
       - BookingOptions__MaxActiveBookings=10
       - Jwt__Secret=${JWT_SECRET_KEY}
       - Jwt__Issuer=EventMgtApi.UsersService
