@@ -1,12 +1,15 @@
+using EventMgtApi.BookingsService.Application.DependencyInjection;
+using EventMgtApi.BookingsService.Infrastructure.DependencyInjection;
 using EventMgtApi.BookingsService.Web.Extensions;
 using EventMgtApi.BookingsService.Web.Filters;
 using EventMgtApi.BookingsService.Web.Middleware;
-using EventMgtApi.BookingsService.Application.DependencyInjection;
-using EventMgtApi.BookingsService.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using System.Reflection;
 using System.Text;
 
@@ -53,6 +56,20 @@ builder.Services.AddAuthentication(options =>
 // Регистрация слоев через расширения
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// OpenTelemetry — трейсы, метрики, логирование
+var serviceName = "bookings-service";
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: serviceName))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(builder.Configuration["Otlp:Endpoint"]!)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter());
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();
@@ -105,6 +122,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Prometheus scraping endpoint
+app.MapPrometheusScrapingEndpoint();
 
 // Подключение маршрутизации контроллеров
 app.MapControllers();

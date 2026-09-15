@@ -1,13 +1,17 @@
-using EventMgtApi.EventsService.Web.Extensions;
-using EventMgtApi.EventsService.Web.Filters;
-using EventMgtApi.EventsService.Web.Middleware;
 using EventMgtApi.EventsService.Application.DependencyInjection;
 using EventMgtApi.EventsService.Infrastructure.DependencyInjection;
 using EventMgtApi.EventsService.Infrastructure.Persistence;
+using EventMgtApi.EventsService.Web.Extensions;
+using EventMgtApi.EventsService.Web.Filters;
+using EventMgtApi.EventsService.Web.Middleware;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using System.Reflection;
 using System.Text;
 
@@ -54,6 +58,20 @@ builder.Services.AddAuthentication(options =>
 // Регистрация слоев через расширения
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// OpenTelemetry — трейсы, метрики, логирование
+var serviceName = "events-service";
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: serviceName))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(builder.Configuration["Otlp:Endpoint"]!)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter());
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();
@@ -106,6 +124,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Prometheus scraping endpoint
+app.MapPrometheusScrapingEndpoint();
 
 // Подключение маршрутизации контроллеров
 app.MapControllers();

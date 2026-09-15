@@ -11,7 +11,9 @@ using System.Text;
 using EventMgtApi.UsersService.Web.Filters;
 using EventMgtApi.UsersService.Web.Middleware;
 using EventMgtApi.UsersService.Web.Extensions;
-
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +57,20 @@ builder.Services.AddAuthentication(options =>
 // Регистрация слоев через расширения
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// OpenTelemetry — трейсы, метрики, логирование
+var serviceName = "users-service";
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: serviceName))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(builder.Configuration["Otlp:Endpoint"]!)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter());
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();
@@ -107,6 +123,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Prometheus scraping endpoint
+app.MapPrometheusScrapingEndpoint();
 
 // Подключение маршрутизации контроллеров
 app.MapControllers();
