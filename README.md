@@ -166,6 +166,9 @@ API предоставляет полный цикл **CRUD**:
 - **JWT-токены** — аутентификация и авторизация
 - **Apache Kafka** — асинхронное межсервисное взаимодействие (pub/sub)
 - **Confluent.Kafka** — .NET-клиент для Kafka
+- **Prometheus** — сбор метрик (metrics)
+- **Jaeger** — распределённое трассирование (traces, OpenTelemetry)
+- **Grafana** — визуализация дашбордов
 
 ---
 
@@ -179,7 +182,9 @@ API предоставляет полный цикл **CRUD**:
 ```
 HomeWork/
 ├── EventMgtService.sln                    # Корневое решение (все сервисы + Contracts)
-├── docker-compose.yml                     # PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
+├── docker-compose.yml                     # PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI + Prometheus + Jaeger + Grafana
+├── prometheus.yml                         # 📈 Конфигурация сбора метрик (targets: 7001/7002/7003)
+├── .env.example                           # пример задания переменных окружения (seed-администратор и др)
 │
 ├── EventMgtApi.Contracts/                 # 📦 Разделяемый проект контрактов
 │   ├── EventMgtApi.Contracts.csproj
@@ -384,8 +389,6 @@ HomeWork/
 │   ├── EventMgtApi.EventsService.Tests.csproj
 │   └── EventServiceTests.cs                                           # Тесты
 │
-└── docker-compose.yml                     # 🐳 PostgreSQL (×3) + Kafka + Zookeeper + Kafka UI
-└── .env.example                     # пример задания переменных окружения (seed-администратор и др)
 ```
 
 ---
@@ -482,8 +485,29 @@ JWT_SECRET_KEY=super-secret-key-for-jwt-token-generation
 | PostgreSQL (Users) | users-postgres | 5433 |
 | PostgreSQL (Events) | events-postgres | 5434 |
 | PostgreSQL (Bookings) | bookings-postgres | 5435 |
+| **Prometheus** | eventapi-prometheus | **9090** |
+| **Jaeger** | eventapi-jaeger | **16686** |
+| **Grafana** | eventapi-grafana | **3000** |
 
 > 💡 Все три сервиса используют одинаковые конфигурации JWT и подключаются к базам по внутреннему Docker-имени хоста (например, `Host=postgres-users;Port=5432`). `appsettings.Development.json` не нужен.
+
+### 📊 Мониторинг и наблюдение
+
+В стек включены три инструмента для сбора метрик, трассировки и визуализации:
+
+| Инструмент | Назначение | Порт (хост) | UI |
+|------------|-----------|-------------|----|
+| **Prometheus** | Сбор метрик (metrics) | **9090** | **http**://localhost:9090 |
+| **Jaeger** | распределённое трассирование (traces, OpenTelemetry) | **16686** | **http**://localhost:16686 |
+| **Grafana** | Визуализация дашбордов | **3000** | **http**://localhost:3000 |
+
+**Prometheus** автоматически собирает метрики со всех трёх сервисов (конец пути `/metrics`) каждые 15 секунд. Конфигурация находится в `prometheus.yml` в корне репозитория.
+
+**Jaeger** принимает OTLP-трейсы от сервисов через gRPC (порт 4317). Для отправки трейсов в каждом сервисе настроен OpenTelemetry-экспортер с адресом `http://jaeger:4317`.
+
+**Grafana** подключается к Prometheus как datasource (по умолчанию `http://prometheus:9090`) и предоставляет дашборды с метриками: p50/p95/p99 задержек, активные запросы, ошибки и т.д.
+
+> ⚠️ Для локального запуска сервисов (Вариант 2) в `prometheus.yml` замените `localhost:7001/7002/7003` на `host.docker.internal:7001/7002/7003`, а в конфигурации OTLP каждого сервиса — `http://jaeger:4317` на `http://host.docker.internal:4317`.
 
 ### Вариант 2: Локальный запуск сервисов (.NET CLI) + Docker-инфраструктура
 
@@ -994,7 +1018,6 @@ dotnet test EventMgtApi.EventsService/EventMgtApi.EventsService.Tests/
 ## 🚧 Будущие улучшения
 
 - Интеграция с email и платежами
-- Распределённое трассирование (OpenTelemetry)
 - API Gateway (Ocelot / YARP)
 ---
 
