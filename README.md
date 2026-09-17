@@ -508,7 +508,7 @@ JWT_SECRET_KEY=super-secret-key-for-jwt-token-generation
 
 **Jaeger** принимает OTLP-трейсы от сервисов через gRPC (порт 4317). Для отправки трейсов в каждом сервисе настроен OpenTelemetry-экспортер с адресом `http://jaeger:4317`.
 
-**Grafana** подключается к Prometheus как datasource (по умолчанию `http://prometheus:9090`) и предоставляет дашборды с метриками: p50/p95/p99 задержек, активные запросы, ошибки и т.д.
+**Grafana** подключается к Prometheus как datasource автоматически (provisioning). Дашборд с метриками: p50/p95/p99 задержек, активные запросы, ошибки, потребление памяти, потоки и RPS — импортируется автоматически при первом запуске.
 
 > ⚠️ Для локального запуска сервисов (Вариант 2) в `prometheus.yml` замените `localhost:7001/7002/7003` на `host.docker.internal:7001/7002/7003`, а в конфигурации OTLP каждого сервиса — `http://jaeger:4317` на `http://host.docker.internal:4317`.
 
