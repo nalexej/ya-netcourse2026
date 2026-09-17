@@ -1,17 +1,25 @@
+using EventMgtApi.BookingsService.Application.DependencyInjection;
+using EventMgtApi.BookingsService.Infrastructure.DependencyInjection;
 using EventMgtApi.BookingsService.Web.Extensions;
 using EventMgtApi.BookingsService.Web.Filters;
 using EventMgtApi.BookingsService.Web.Middleware;
-using EventMgtApi.BookingsService.Application.DependencyInjection;
-using EventMgtApi.BookingsService.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using System.Reflection;
 using System.Text;
-
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+       .WriteTo.Console(new CompactJsonFormatter()));
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
@@ -53,6 +61,32 @@ builder.Services.AddAuthentication(options =>
 // Регистрация слоев через расширения
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// OpenTelemetry — трейсы, метрики, логирование
+var serviceName = "bookings-service";
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService(serviceName: serviceName))
+    .WithTracing(tracing => tracing
+        // Настраиваем автосбор входящих запросов с фильтрацией
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            // Исключаем системные запросы из трейсинга
+            options.Filter = httpContext =>
+            {
+                var path = httpContext.Request.Path;
+
+                // Если запрос идёт на /health или /metrics, спан НЕ создаётся
+                return !path.StartsWithSegments("/health") &&
+                       !path.StartsWithSegments("/metrics");
+            };
+        })
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(builder.Configuration["Otlp:Endpoint"]!)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter());
 
 // Регистрация Swagger для документации API
 builder.Services.AddEndpointsApiExplorer();
@@ -105,6 +139,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Prometheus scraping endpoint
+app.MapPrometheusScrapingEndpoint();
 
 // Подключение маршрутизации контроллеров
 app.MapControllers();

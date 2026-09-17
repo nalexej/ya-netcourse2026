@@ -150,6 +150,7 @@ services:
       - Redis__ConnectRetry=1
       - EventCache__EventTtlSeconds=300
       - EventCache__TopEventsTtlSeconds=300
+      - Otlp__Endpoint=http://jaeger:4317
     depends_on:
       postgres-events:
         condition: service_healthy
@@ -177,6 +178,7 @@ services:
       - Jwt__Secret=${JWT_SECRET_KEY}
       - Jwt__Issuer=EventMgtApi.UsersService
       - Jwt__Audience=EventMgtApi
+      - Otlp__Endpoint=http://jaeger:4317      
     depends_on:
       postgres-bookings:
         condition: service_healthy
@@ -200,11 +202,47 @@ services:
       - Jwt__Audience=EventMgtApi
       - SeedOptions__Admins__0__Login=${SEED_ADMIN_LOGIN}
       - SeedOptions__Admins__0__Password=${SEED_ADMIN_PASSWORD}
+      - Otlp__Endpoint=http://jaeger:4317      
     depends_on:
       postgres-users:
         condition: service_healthy
     networks:
       - eventapi-network
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: eventapi-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - eventapi-network      
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    container_name: eventapi-jaeger
+    ports:
+      - "16686:16686"   # UI
+      - "4317:4317"     # OTLP gRPC
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - eventapi-network      
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: eventapi-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - eventapi-network      
 
 networks:
   eventapi-network:
@@ -214,3 +252,4 @@ volumes:
   users_pgdata:
   events_pgdata:
   bookings_pgdata:
+  grafana-data:
